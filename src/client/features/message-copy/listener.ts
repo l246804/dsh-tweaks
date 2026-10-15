@@ -49,19 +49,29 @@ export interface CopyListenerPorts {
  * The `copy` event arrives from the page, so every field is treated as
  * possibly absent; a wrong guess here would throw inside a copy handler, which
  * a browser reports as a broken copy rather than a plugin error.
+ *
+ * Suppression lives on the *event* while the write channel lives on its
+ * `clipboardData`, and the copy action is handed one object. They are joined
+ * here, at the only place that sees the event, rather than by widening the
+ * action's idea of an event: the suppression is offered as a capability the
+ * channel may or may not carry, exactly like `setData` itself.
  * @param event - the raw event.
  * @returns the target and data channel, either possibly undefined.
  */
 function readEvent(event: unknown): { target: unknown, data: CopyEventData | undefined } {
   if (typeof event !== 'object' || event === null)
     return { target: undefined, data: undefined }
-  const candidate = event as { target?: unknown, clipboardData?: unknown }
+  const candidate = event as { target?: unknown, clipboardData?: unknown, preventDefault?: unknown }
   const data = candidate.clipboardData
+  if (typeof data !== 'object' || data === null || typeof (data as CopyEventData).setData !== 'function')
+    return { target: candidate.target, data: undefined }
+  const suppress = candidate.preventDefault
   return {
     target: candidate.target,
-    data: typeof data === 'object' && data !== null && typeof (data as CopyEventData).setData === 'function'
-      ? data as CopyEventData
-      : undefined,
+    data: {
+      setData: (data as CopyEventData).setData.bind(data),
+      ...(typeof suppress === 'function' ? { preventDefault: suppress.bind(event) } : {}),
+    },
   }
 }
 

@@ -20,7 +20,7 @@
  * @module @leiwang2000/dsh-tweaks/test/features/message-copy/listener
  */
 
-import type { ClipboardWriter, CopyOutcome } from '../../../src/client/features/message-copy/clipboard.ts'
+import type { ClipboardWriter, CopyEventData, CopyOutcome } from '../../../src/client/features/message-copy/clipboard.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { installCopyListener } from '../../../src/client/features/message-copy/listener.ts'
 import { messageContent } from '../../../src/client/features/message-copy/payload.ts'
@@ -49,8 +49,12 @@ function source(
 }
 
 /** Build a copy event whose target is one element. */
-function copyEvent(target: unknown, data?: { setData: (type: string, value: string) => void }) {
-  return { type: 'copy', target, clipboardData: data }
+function copyEvent(
+  target: unknown,
+  data?: { setData: (type: string, value: string) => void },
+  preventDefault: () => void = () => {},
+) {
+  return { type: 'copy', target, clipboardData: data, preventDefault }
 }
 
 /** One durable image on a copied message. */
@@ -194,9 +198,13 @@ describe('the document copy listener', () => {
     const dom = createFakeDom()
     const registry = createRowRegistry()
     registry.register(source('4:userm-1'))
-    const data = { setData: vi.fn() }
-    const copy = vi.fn((_source: unknown, channel: unknown) => {
-      expect(channel).toBe(data)
+    const setData = vi.fn()
+    const data = { setData }
+    const copy = vi.fn((_source: unknown, channel: CopyEventData | undefined) => {
+      // Asserted through the channel rather than by identity: what the copy
+      // action needs is a channel that reaches the event, not the event's own
+      // object, and a wrapper that swallowed the write would fail here.
+      channel?.setData('text/plain', 'through the channel')
       return Promise.resolve<CopyOutcome>({ status: 'copied', attachmentsIncluded: false, omittedImages: 0 })
     })
 
@@ -205,6 +213,7 @@ describe('the document copy listener', () => {
     dom.document.dispatchEvent(copyEvent(target, data))
 
     expect(copy).toHaveBeenCalledTimes(1)
+    expect(setData).toHaveBeenCalledWith('text/plain', 'through the channel')
   })
 
   it('passes no channel when the event offered none', () => {
@@ -350,5 +359,80 @@ describe('the anchor lookup the listener depends on', () => {
     const wrapper = rowElement(dom, 'user', '4:userm-7')
 
     expect(copyableRowKey(wrapper)).toBe('4:userm-7')
+  })
+})
+
+describe('suppressing the browser\'s own copy', () => {
+  it('takes the event over once it has claimed the row, so the payload stands', () => {
+    const dom = createFakeDom()
+    const registry = createRowRegistry()
+    registry.register(source('4:userm-1'))
+
+    const target = rowElement(dom, 'user', '4:userm-1')
+    const preventDefault = vi.fn()
+    const setData = vi.fn()
+    installCopyListener(dom.document, {
+      registry,
+      copy: (resolved, channel) => performCopy(resolved, channel, textOnlyWriter()),
+    })
+    dom.document.dispatchEvent(copyEvent(target, { setData }, preventDefault))
+
+    // Synchronous, in the handler's own turn: the browser finishes its default
+    // action as soon as this listener returns, so a suppression decided later
+    // would arrive after the selection had already replaced the payload.
+    expect(setData).toHaveBeenCalledWith('text/plain', 'text of 4:userm-1')
+    expect(preventDefault).toHaveBeenCalledTimes(1)
+  })
+
+  it('leaves a selection outside a user row to the browser', () => {
+    const dom = createFakeDom()
+    const registry = createRowRegistry()
+    const preventDefault = vi.fn()
+    // An assistant row: this plugin has no business changing what it copies.
+    const target = rowElement(dom, 'assistant', '4:assistant-1')
+    installCopyListener(dom.document, {
+      registry,
+      copy: (resolved, channel) => performCopy(resolved, channel, textOnlyWriter()),
+    })
+    dom.document.dispatchEvent(copyEvent(target, { setData: vi.fn() }, preventDefault))
+
+    expect(preventDefault).not.toHaveBeenCalled()
+  })
+
+  it('leaves a user row that never published itself to the browser', () => {
+    const dom = createFakeDom()
+    const registry = createRowRegistry()
+    const preventDefault = vi.fn()
+    // The anchors are a user row's, but nothing registered under that key: a
+    // guess here would overwrite the selection with the wrong message.
+    const target = rowElement(dom, 'user', '4:userm-unregistered')
+    installCopyListener(dom.document, {
+      registry,
+      copy: (resolved, channel) => performCopy(resolved, channel, textOnlyWriter()),
+    })
+    dom.document.dispatchEvent(copyEvent(target, { setData: vi.fn() }, preventDefault))
+
+    expect(preventDefault).not.toHaveBeenCalled()
+  })
+
+  it('keeps the browser default when the channel refuses the payload', () => {
+    const dom = createFakeDom()
+    const registry = createRowRegistry()
+    registry.register(source('4:userm-1'))
+
+    const target = rowElement(dom, 'user', '4:userm-1')
+    const preventDefault = vi.fn()
+    const setData = vi.fn(() => {
+      throw new Error('read-only channel')
+    })
+    installCopyListener(dom.document, {
+      registry,
+      copy: (resolved, channel) => performCopy(resolved, channel, textOnlyWriter()),
+    })
+    dom.document.dispatchEvent(copyEvent(target, { setData }, preventDefault))
+
+    // Nothing of ours landed, so suppressing the default would leave the user
+    // with an empty clipboard instead of the selection they copied.
+    expect(preventDefault).not.toHaveBeenCalled()
   })
 })

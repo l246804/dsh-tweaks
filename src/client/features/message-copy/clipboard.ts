@@ -33,14 +33,21 @@ export interface ClipboardImage {
 /**
  * The `DataTransfer` a `copy` event hands its listener.
  *
- * Modelled structurally rather than as the browser's own type: the only thing
- * this feature does with it is `setData`, and typing it that narrowly is what
- * lets this module stay import-free, so a plain Node test can execute the whole
- * copy decision without a browser.
+ * Modelled structurally rather than as the browser's own type: the only things
+ * this feature does with it are `setData` and a suppression decision, and typing
+ * it that narrowly is what lets this module stay import-free, so a plain Node
+ * test can execute the whole copy decision without a browser.
  */
 export interface CopyEventData {
   /** Place one representation on the clipboard before the handler returns. */
   readonly setData: (type: string, value: string) => void
+  /**
+   * Stop the browser from performing its own copy of the selection.
+   *
+   * Absent on a channel that cannot be suppressed; a caller must therefore treat
+   * suppression as optional rather than assume it.
+   */
+  readonly preventDefault?: () => void
 }
 
 /** The clipboard flavor carrying plain text. */
@@ -53,6 +60,14 @@ const TEXT_FLAVOR = 'text/plain'
  * still running, so the event's `DataTransfer` is the one route a
  * text-selection copy can rely on. The asynchronous writer stays available
  * underneath for the image flavor, which the event channel cannot carry.
+ *
+ * Suppressing the browser's own copy is decided *here*, from the outcome of the
+ * write it would otherwise overwrite. A `copy` listener that returned without
+ * filling the channel leaves the browser's default action as the only thing that
+ * puts anything on the clipboard, so an unconditional suppression would answer a
+ * refused write with an empty clipboard; suppressing only after our own text
+ * landed is what makes the selection copy agree with the button. Both happen in
+ * the caller's synchronous turn, which is the only window either is accepted in.
  *
  * This lives here rather than beside the browser adapters because it is pure:
  * it only wraps the port. Keeping it in this import-free module is what lets
@@ -67,13 +82,17 @@ export function eventWriter(base: ClipboardWriter, data: CopyEventData): Clipboa
     writeEventText(text) {
       try {
         data.setData(TEXT_FLAVOR, text)
-        return true
       }
       catch {
         // A read-only channel (or an event already past its window) is not
-        // fatal: the asynchronous writer still gets its turn.
+        // fatal: the asynchronous writer still gets its turn, and the browser's
+        // own copy of the selection remains the honest fallback.
         return false
       }
+      // Our payload is on the clipboard, so the selection must not replace it.
+      // A channel without the operation simply cannot be suppressed.
+      data.preventDefault?.()
+      return true
     },
   }
 }
