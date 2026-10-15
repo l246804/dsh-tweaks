@@ -95,6 +95,37 @@ describe('pruneExpansion', () => {
     const result = pruneExpansion(['/w/srcx'], { '/w/srcx': {} }, '/w', [])
     expect(result.removed).toEqual(['/w/srcx'])
   })
+
+  it('keeps a deeper directory that the re-read listing says nothing about', () => {
+    // Only a *direct* child of `/w` can be missing *from `/w`'s listing*. A chain
+    // expanded three levels deep is still loading when the root's own listing
+    // lands, and judging the grandchild by the root's entries would delete the
+    // very directory the active file is waiting on.
+    const levels = { '/w': {}, '/w/src': {}, '/w/src/deep': {} }
+    const result = pruneExpansion(['/w', '/w/src', '/w/src/deep'], levels, '/w', [
+      { name: 'src', type: 'directory' },
+      { name: 'a.txt', type: 'file' },
+    ])
+    expect(result.removed).toEqual([])
+    expect(result.expanded).toEqual(['/w', '/w/src', '/w/src/deep'])
+  })
+
+  it('keeps the descendants of a directory that is still listed, one level down', () => {
+    const levels = { '/w/src': {}, '/w/src/deep': {}, '/w/src/deep/deeper': {} }
+    const result = pruneExpansion(['/w/src', '/w/src/deep', '/w/src/deep/deeper'], levels, '/w/src', [
+      { name: 'deep', type: 'directory' },
+    ])
+    expect(result.removed).toEqual([])
+  })
+
+  it('takes a vanished directory\'s whole subtree with it', () => {
+    const levels = { '/w': {}, '/w/gone': {}, '/w/gone/deep': {}, '/w/kept': {} }
+    const result = pruneExpansion(['/w', '/w/gone', '/w/gone/deep', '/w/kept'], levels, '/w', [
+      { name: 'kept', type: 'directory' },
+    ])
+    expect(result.removed).toEqual(['/w/gone', '/w/gone/deep'])
+    expect(result.expanded).toEqual(['/w', '/w/kept'])
+  })
 })
 
 describe('visibleRows', () => {

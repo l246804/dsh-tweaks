@@ -75,11 +75,24 @@ function isUnder(path: string, ancestor: string): boolean {
  * A directory can disappear between two reads (deleted, or replaced by a
  * file). Its cached level would otherwise linger and be rendered again the
  * moment the reader expands a directory that no longer lists it.
+ *
+ * The one rule that decides how much is pruned: **only a direct child of the
+ * re-read directory can be judged by its listing.** A deeper path is answered
+ * for by its own parent's listing, which this one says nothing about. Reading
+ * `parent`'s entries as a verdict on the whole subtree is tempting and wrong:
+ * activating a file three levels down expands the chain and lists all of it at
+ * once, and the root's reply reliably lands first, so a grandchild judged by the
+ * root's entries would be deleted while its own listing is still in flight, and
+ * the row the reader is waiting for would never be drawn.
+ *
+ * A directory that did vanish takes its whole subtree with it: a cached level
+ * under it describes rows nothing can reach any more.
  * @param expanded - the currently expanded paths.
  * @param levels - cached levels keyed by path.
  * @param parent - the directory whose listing was just applied.
  * @param entries - the listing's entries, after ordering.
- * @returns the surviving expansion list, in its original order.
+ * @returns the surviving expansion list, in its original order, and every path
+ * dropped from either side: vanished directories and their descendants.
  */
 export function pruneExpansion(
   expanded: readonly string[],
@@ -88,13 +101,20 @@ export function pruneExpansion(
   entries: readonly WorkspaceDirectoryEntry[],
 ): { readonly expanded: string[], readonly removed: readonly string[] } {
   const alive = new Set(entries.filter(entry => entry.type === 'directory').map(entry => childPath(parent, entry.name)))
-  const removed: string[] = []
-  for (const path of [...Object.keys(levels), ...expanded]) {
+  // A path is a direct child exactly when the text after `parent` and one
+  // separator holds no further separator. `parent` is normalized only to measure
+  // that; an unnormalized caller is already ignored by the `isUnder` guard above,
+  // so the two tests cannot disagree.
+  const after = parent.replace(/[/\\]+$/u, '').length + 1
+  const candidates = [...new Set([...Object.keys(levels), ...expanded])]
+  const vanished = new Set(candidates.filter((path) => {
     if (!isUnder(path, parent) || path === parent || alive.has(path))
-      continue
-    if (!removed.includes(path))
-      removed.push(path)
-  }
+      return false
+    return !path.slice(after).includes('/')
+  }))
+  const gone = [...vanished]
+  const removed = candidates.filter(path =>
+    vanished.has(path) || gone.some(ancestor => path.startsWith(`${ancestor}/`)))
   return { expanded: expanded.filter(path => !removed.includes(path)), removed }
 }
 
