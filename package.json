@@ -1,18 +1,22 @@
 {
-  "name": "pkg-placeholder",
+  "name": "@leiwang2000/dsh-tweaks",
   "type": "module",
   "version": "0.0.0",
   "packageManager": "pnpm@12.8.1",
-  "description": "_description_",
+  "description": "Tweaks that improve the DeepSeek Harness (DSH) experience",
   "author": "leiwang <leiwang2000@foxmail.com>",
   "license": "MIT",
-  "homepage": "https://github.com/l246804/starter-ts#readme",
+  "homepage": "https://github.com/l246804/dsh-tweaks#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/l246804/starter-ts.git"
+    "url": "git+https://github.com/l246804/dsh-tweaks.git"
   },
-  "bugs": "https://github.com/l246804/starter-ts/issues",
-  "keywords": [],
+  "bugs": "https://github.com/l246804/dsh-tweaks/issues",
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "tweaks"
+  ],
   "sideEffects": false,
   "exports": {
     ".": "./dist/index.mjs",
