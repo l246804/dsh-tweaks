@@ -12,6 +12,7 @@
     "skipLibCheck": true
   },
   "exclude": [
-    "deepseek-harness"
+    "deepseek-harness",
+    ".verify-home"
   ]
 }
