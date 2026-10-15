@@ -138,6 +138,54 @@ describe('visibleRows', () => {
     expect(visibleRows('/w', levels, ['/w']).map(row => row.path)).toEqual(['/w/src', '/w/a.txt'])
   })
 
+  it('orders every level the way the built-in tree does, not the way the endpoint replied', () => {
+    // The listing order is the endpoint's, and it is not a display order: the
+    // panel replaces the built-in tree, so a level drawn in arrival order is a
+    // visible regression. `orderEntries` is the rule, and this is the wiring.
+    const unordered = {
+      '/w': {
+        kind: 'ready' as const,
+        entries: [
+          { name: 'a.txt', type: 'file' as const },
+          { name: 'zeta', type: 'directory' as const },
+          { name: 'file10.txt', type: 'file' as const },
+          { name: 'file2.txt', type: 'file' as const },
+        ],
+      },
+    }
+    expect(visibleRows('/w', unordered, ['/w']).map(row => row.path))
+      .toEqual(['/w/zeta', '/w/a.txt', '/w/file2.txt', '/w/file10.txt'])
+  })
+
+  it('orders a nested level too, so reopening a directory cannot reshuffle it', () => {
+    const unordered = {
+      '/w': { kind: 'ready' as const, entries: [{ name: 'dir', type: 'directory' as const }] },
+      '/w/dir': {
+        kind: 'ready' as const,
+        entries: [
+          { name: 'b.txt', type: 'file' as const },
+          { name: 'Alpha', type: 'directory' as const },
+        ],
+      },
+    }
+    expect(visibleRows('/w', unordered, ['/w', '/w/dir']).map(row => row.path))
+      .toEqual(['/w/dir', '/w/dir/Alpha', '/w/dir/b.txt'])
+  })
+
+  it('orders a level while searching, so a filtered view is not in arrival order', () => {
+    const unordered = {
+      '/w': {
+        kind: 'ready' as const,
+        entries: [
+          { name: 'b-report.txt', type: 'file' as const },
+          { name: 'a-report.txt', type: 'file' as const },
+        ],
+      },
+    }
+    expect(visibleRows('/w', unordered, ['/w'], 'report').map(row => row.path))
+      .toEqual(['/w/a-report.txt', '/w/b-report.txt'])
+  })
+
   it('descends into an expanded directory and reports the depth', () => {
     const rows = visibleRows('/w', levels, ['/w', '/w/src'])
     expect(rows.map(row => [row.path, row.depth])).toEqual([['/w/src', 0], ['/w/src/b.ts', 1], ['/w/a.txt', 0]])
