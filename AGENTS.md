@@ -8,6 +8,19 @@
 - Before committing, `pnpm run ci` MUST pass.
 - Commit messages follow Conventional Commits.
 
+## Upstream reference submodule
+
+`deepseek-harness/` is a Git submodule pointing at
+[deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness).
+It exists as read-only reference material for developing this package.
+
+- It MUST NOT be edited, imported, published, or added to dependencies.
+- It MUST stay excluded from every local tool: ESLint (`eslint.config.js`),
+  `tsc` (`tsconfig.json`), knip (`knip.json`), and Vitest
+  (`vitest.config.ts`). Any new scanning tool MUST exclude it too.
+- Never commit a change to the pinned submodule commit unless the task is
+  explicitly to bump that reference.
+
 ## Agent skills
 
 ### Issue tracker

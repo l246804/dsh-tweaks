@@ -10,5 +10,8 @@
     "verbatimModuleSyntax": true,
     "skipDefaultLibCheck": true,
     "skipLibCheck": true
-  }
+  },
+  "exclude": [
+    "deepseek-harness"
+  ]
 }

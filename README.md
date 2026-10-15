@@ -8,6 +8,26 @@
 
 Tweaks that improve the DeepSeek Harness (DSH) experience.
 
+## Development
+
+This repo keeps an upstream copy of [deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) as a Git submodule under `deepseek-harness/`. It is reference material only. The local toolchain (ESLint, `tsc`, knip, Vitest, tsdown) explicitly excludes it, and it is never published.
+
+Clone with the submodule, or fetch it in an existing checkout:
+
+```bash
+git clone --recursive <repo-url>
+# or, in an existing checkout
+git submodule update --init --recursive
+```
+
+Because the submodule is pinned to a specific commit, treat it as read-only. To move it to a newer upstream commit:
+
+```bash
+git -C deepseek-harness fetch origin
+git -C deepseek-harness checkout <commit-or-tag>
+git add deepseek-harness
+```
+
 ## Note for Developers
 
 This starter recommands using [npm Trusted Publisher](https://github.com/e18e/ecosystem-issues/issues/201), where the release is done on CI to ensure the security of the packages.
