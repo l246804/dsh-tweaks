@@ -9,9 +9,6 @@
     "scripts/*.mjs",
     "test/**/*.test.ts"
   ],
-  "ignore": [
-    "deepseek-harness/**"
-  ],
   "ignoreDependencies": [
     "@antfu/utils",
     "taze",
@@ -19,5 +16,8 @@
   ],
   "ignoreBinaries": [
     "dsh"
+  ],
+  "ignoreWorkspaces": [
+    "deepseek-harness"
   ]
 }
