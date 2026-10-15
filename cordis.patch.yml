@@ -1,0 +1,10 @@
+# The bundle layer of @leiwang2000/dsh-tweaks.
+#
+# Installing this package into a profile (`dsh plugin --profile <name> add .`)
+# appends the package name to that profile's `dsh.profile.bundles`, and the
+# composer applies this file as one layer. The single row below mounts the
+# package itself: the host half is an empty `apply()`, and the browser half
+# ships through `exports["./client"]`, declared by `dsh.client`.
+- insert:
+    - id: dsh-tweaks
+      name: '@leiwang2000/dsh-tweaks'

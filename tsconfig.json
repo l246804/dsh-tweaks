@@ -1,8 +1,17 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "lib": ["ESNext"],
+    "jsx": "react-jsx",
+    // DOM is part of this package's surface: the browser half (src/client)
+    // renders React into the host page and patches its DOM. The host half is
+    // still plain Node ESM; it simply does not use these globals.
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "Preserve",
+    "moduleResolution": "bundler",
+    // The plugin's sources and its tests import each other with explicit `.ts`
+    // specifiers, so the compiled artifact never depends on a resolver guessing
+    // the extension. Nothing is emitted (`noEmit`), so there is no rewrite.
+    "allowImportingTsExtensions": true,
     "strict": true,
     "strictNullChecks": true,
     "noEmit": true,

@@ -10,5 +10,13 @@ describe('api snapshot', () => {
     await guardStaleBuild({ root })
   })
 
-  snapshotApiPerEntry(root)
+  const browserEntry = './client'
+
+  snapshotApiPerEntry(root, {
+    // The `./client` export is a browser closure factory, not a Node module: it
+    // calls `window.__ModuleLoader__.load` at load time, so it has no API to
+    // snapshot here. Its contract is asserted by `scripts/check-artifact.mjs`
+    // instead, which runs it through a stand-in module loader.
+    entryFilter: ({ entryName }) => entryName !== browserEntry,
+  })
 })

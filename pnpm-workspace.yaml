@@ -1,12 +1,23 @@
 ignoreWorkspaceRootCheck: true
 catalogMode: prefer
+
 minimumReleaseAgeExcludePrune: true
+# The upstream DeepSeek Harness alpha line publishes faster than the release-age
+# gate allows, and this package is written against one exact version of it.
+minimumReleaseAgeExclude:
+  - '@deepseek-ai/*'
+
 trustPolicy: no-downgrade
 
 update:
   ignoreDeps:
     - typescript@7
 
+# `@deepseek-ai/dsh` is an optional peer that states the compatible runtime
+# range read at install and boot time. It is deliberately not materialized: the
+# CLI resolves the plugin against the running installation, and pulling a whole
+# second DSH tree in would add native build scripts nothing here needs.
+autoInstallPeers: false
 shellEmulator: true
 
 packages:
@@ -18,6 +29,22 @@ packages:
 allowBuilds:
   esbuild: true
   simple-git-hooks: true
+
+catalog:
+  '@deepseek-ai/cordis': 4.0.5-alpha.2
+  '@deepseek-ai/dsh-api-remotes': 0.2.1-alpha.3
+  '@deepseek-ai/dsh-api-session-controller': 0.2.1-alpha.3
+  '@deepseek-ai/dsh-api-workspace-files': 0.2.1-alpha.3
+  '@deepseek-ai/dsh-client-locale': 0.2.1-alpha.3
+  '@deepseek-ai/dsh-client-ui-attachment': 0.2.1-alpha.3
+  '@deepseek-ai/dsh-client-ui-conversation': 0.2.1-alpha.3
+  '@deepseek-ai/dsh-client-ui-dockkit': 0.2.1-alpha.3
+  '@deepseek-ai/dsh-client-ui-primitives': 0.2.1-alpha.3
+  '@deepseek-ai/dsh-client-ui-sidebar-right': 0.2.1-alpha.3
+  '@deepseek-ai/dsh-client-ui-slots': 0.2.1-alpha.3
+  '@deepseek-ai/dsh-util-workspace-path': 0.2.1-alpha.3
+  '@types/react': 18.3.12
+  react: 18.3.1
 
 catalogs:
   agentic:

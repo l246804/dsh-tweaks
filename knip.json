@@ -1,6 +1,23 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
-  "project": ["src/**/*.ts"],
-  "ignore": ["deepseek-harness/**", ".verify-home/**"],
-  "ignoreDependencies": ["@antfu/utils", "taze"]
+  "project": [
+    "src/**/*.ts",
+    "test/**/*.ts"
+  ],
+  "entry": [
+    "src/client/index.ts",
+    "scripts/*.mjs",
+    "test/**/*.test.ts"
+  ],
+  "ignore": [
+    "deepseek-harness/**"
+  ],
+  "ignoreDependencies": [
+    "@antfu/utils",
+    "taze",
+    "@deepseek-ai/dsh"
+  ],
+  "ignoreBinaries": [
+    "dsh"
+  ]
 }

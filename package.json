@@ -20,12 +20,22 @@
   "sideEffects": false,
   "exports": {
     ".": "./dist/index.mjs",
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./client": "./dist/client.js"
   },
   "types": "./dist/index.d.mts",
   "files": [
+    "cordis.patch.yml",
     "dist"
   ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web"
+    }
+  },
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
@@ -36,7 +46,9 @@
     "start": "tsx src/index.ts",
     "test": "pnpm run build && vitest",
     "typecheck": "tsc",
-    "ci": "pnpm run lint && pnpm run typecheck && pnpm run knip && pnpm run test --run",
+    "check:artifact": "node scripts/check-artifact.mjs",
+    "verify:e2e": "node scripts/verify-e2e.mjs",
+    "ci": "pnpm run lint && pnpm run typecheck && pnpm run knip && pnpm run test --run && pnpm run check:artifact",
     "prepare": "git config core.hooksPath .githooks && simple-git-hooks && skills experimental_sync -y -a universal"
   },
   "scripts-info": {
@@ -52,11 +64,32 @@
     "ci": "Run the full continuous integration pipeline",
     "prepare": "Set up git hooks and skills"
   },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": "^0.2.1-alpha.3"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "@antfu/eslint-config": "catalog:cli",
     "@antfu/ni": "catalog:cli",
     "@antfu/utils": "catalog:inlined",
+    "@deepseek-ai/cordis": "catalog:",
+    "@deepseek-ai/dsh-api-remotes": "catalog:",
+    "@deepseek-ai/dsh-api-session-controller": "catalog:",
+    "@deepseek-ai/dsh-api-workspace-files": "catalog:",
+    "@deepseek-ai/dsh-client-locale": "catalog:",
+    "@deepseek-ai/dsh-client-ui-attachment": "catalog:",
+    "@deepseek-ai/dsh-client-ui-conversation": "catalog:",
+    "@deepseek-ai/dsh-client-ui-dockkit": "catalog:",
+    "@deepseek-ai/dsh-client-ui-primitives": "catalog:",
+    "@deepseek-ai/dsh-client-ui-sidebar-right": "catalog:",
+    "@deepseek-ai/dsh-client-ui-slots": "catalog:",
+    "@deepseek-ai/dsh-util-workspace-path": "catalog:",
     "@types/node": "catalog:types",
+    "@types/react": "catalog:",
     "bumpp": "catalog:cli",
     "eslint": "catalog:cli",
     "eslint-plugin-slop": "catalog:cli",
@@ -64,6 +97,7 @@
     "knip": "catalog:cli",
     "nano-staged": "catalog:cli",
     "publint": "catalog:cli",
+    "react": "catalog:",
     "simple-git-hooks": "catalog:cli",
     "skills": "catalog:agentic",
     "taze": "catalog:cli",
@@ -76,11 +110,27 @@
     "vitest": "catalog:testing"
   },
   "skills": [
-    { "source": "mattpocock/skills/skills/engineering" },
-    { "source": "mattpocock/skills/skills/productivity" },
-    { "source": "antfu/skills", "skills": ["antfu"] },
-    { "source": "anthropics/skills/skills/frontend-design" },
-    { "source": "ericlitman/open-pstack/plugins/pstack/skills", "skills": ["unslop"] }
+    {
+      "source": "mattpocock/skills/skills/engineering"
+    },
+    {
+      "source": "mattpocock/skills/skills/productivity"
+    },
+    {
+      "source": "antfu/skills",
+      "skills": [
+        "antfu"
+      ]
+    },
+    {
+      "source": "anthropics/skills/skills/frontend-design"
+    },
+    {
+      "source": "ericlitman/open-pstack/plugins/pstack/skills",
+      "skills": [
+        "unslop"
+      ]
+    }
   ],
   "simple-git-hooks": {
     "pre-commit": "pnpm i --frozen-lockfile --ignore-scripts --offline && pnpm run ci && pnpx nano-staged"
