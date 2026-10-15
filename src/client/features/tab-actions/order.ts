@@ -9,6 +9,8 @@
  * (`[data-dockkit-content]` = tab id) that also states whether it is docked or
  * floating. Those three attributes are a contract the kit keeps for itself, so
  * reading them is reading a stable surface rather than reverse-engineering one.
+ * The attribute names and their escaping come from `dom/dock-anchors.ts`, which
+ * the file panel reads the same anchors through.
  *
  * Two consequences of that markup decide the shape of this module:
  *
@@ -25,15 +27,18 @@
 
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { OrderedTab, TabHost } from './targets.ts'
+import {
+  DOCK_HOST,
+  DOCKKIT_CONTENT,
+  DOCKKIT_FLOAT,
+  DOCKKIT_HOST,
+  DOCKKIT_STRIP_TABS,
+  DOCKKIT_TAB,
+  FLOAT_HOST,
+  SIDEBAR_SESSION,
+  tabHostOf,
+} from '../../dom/dock-anchors.ts'
 import { attributeSelector } from '../../dom/selector.ts'
-
-/** The attributes the reading depends on, named once. */
-const SESSION = 'data-sidebar-right-session'
-const STRIP_TABS = 'data-dockkit-strip-tabs'
-const CHIP = 'data-dockkit-tab'
-const CONTENT = 'data-dockkit-content'
-const HOST = 'data-dockkit-host'
-const FLOAT = 'data-dockkit-float'
 
 /**
  * The narrowest element surface this reader needs.
@@ -86,9 +91,6 @@ export interface KindRecord {
   readonly kind: string
 }
 
-/** The `host` value the kit writes on a floating tab's section. */
-const FLOAT_HOST: TabHost = 'float'
-
 /** One tab host section, as the kit writes it. */
 interface SectionEntry {
   readonly id: string
@@ -109,12 +111,15 @@ interface SectionEntry {
  */
 function sectionEntries(root: ReadableRoot, scope: string): readonly SectionEntry[] {
   const entries: SectionEntry[] = []
-  for (const section of root.querySelectorAll(`${scope} ${attributeSelector(CONTENT)}`)) {
-    const id = section.getAttribute(CONTENT)
+  for (const section of root.querySelectorAll(`${scope} ${attributeSelector(DOCKKIT_CONTENT)}`)) {
+    const id = section.getAttribute(DOCKKIT_CONTENT)
     if (id === null)
       continue
-    const floating = section.getAttribute(HOST) === FLOAT_HOST
-    entries.push({ id, host: floating ? FLOAT_HOST : 'dock', floatPaneId: section.getAttribute(FLOAT) ?? undefined })
+    entries.push({
+      id,
+      host: tabHostOf(section.getAttribute(DOCKKIT_HOST)),
+      floatPaneId: section.getAttribute(DOCKKIT_FLOAT) ?? undefined,
+    })
   }
   return entries
 }
@@ -130,12 +135,12 @@ function sectionEntries(root: ReadableRoot, scope: string): readonly SectionEntr
  */
 function stripPlacements(root: ReadableRoot, scope: string): readonly TabPlacement[] {
   const placements: TabPlacement[] = []
-  for (const strip of root.querySelectorAll(`${scope} ${attributeSelector(STRIP_TABS)}`)) {
-    const paneId = strip.getAttribute(STRIP_TABS) ?? undefined
-    for (const chip of strip.querySelectorAll(attributeSelector(CHIP))) {
-      const id = chip.getAttribute(CHIP)
+  for (const strip of root.querySelectorAll(`${scope} ${attributeSelector(DOCKKIT_STRIP_TABS)}`)) {
+    const paneId = strip.getAttribute(DOCKKIT_STRIP_TABS) ?? undefined
+    for (const chip of strip.querySelectorAll(attributeSelector(DOCKKIT_TAB))) {
+      const id = chip.getAttribute(DOCKKIT_TAB)
       if (id !== null)
-        placements.push({ id: id as TabId, host: 'dock', paneId })
+        placements.push({ id: id as TabId, host: DOCK_HOST, paneId })
     }
   }
   return placements
@@ -155,9 +160,9 @@ function stripPlacements(root: ReadableRoot, scope: string): readonly TabPlaceme
  * @returns one placement per tab, or an empty list when no panel is drawn.
  */
 export function readPlacements(root: ReadableRoot, sessionId: string): readonly TabPlacement[] {
-  const scope = attributeSelector(SESSION, sessionId)
+  const scope = attributeSelector(SIDEBAR_SESSION, sessionId)
   const sections = sectionEntries(root, scope)
-  const docked = new Set(sections.filter(section => section.host === 'dock').map(section => section.id))
+  const docked = new Set(sections.filter(section => section.host === DOCK_HOST).map(section => section.id))
   const placements: TabPlacement[] = []
   const placed = new Set<string>()
   // A floating tab has no strip position at all, so a strip naming one is not
@@ -169,7 +174,7 @@ export function readPlacements(root: ReadableRoot, sessionId: string): readonly 
     placed.add(id)
     placements.push(placement)
   }
-  for (const host of ['dock', FLOAT_HOST] as const) {
+  for (const host of [DOCK_HOST, FLOAT_HOST] as const) {
     for (const section of sections) {
       if (section.host !== host || placed.has(section.id))
         continue
@@ -213,7 +218,7 @@ export function combineOrder(
   for (const record of records) {
     if (seen.has(record.id))
       continue
-    ordered.push({ id: record.id as TabId, kind: record.kind, host: 'dock', paneId: undefined })
+    ordered.push({ id: record.id as TabId, kind: record.kind, host: DOCK_HOST, paneId: undefined })
   }
   return ordered
 }

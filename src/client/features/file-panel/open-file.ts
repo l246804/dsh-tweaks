@@ -38,7 +38,7 @@
 export interface OpenTabLike<Id extends string = string> {
   /** The tab's identity. */
   readonly id: Id
-  /** The tab kind; the file list's own kind is what a page tab identifies itself by. */
+  /** The tab kind; the files tab's own kind is what a page tab identifies itself by. */
   readonly kind: string
   /** The address the tab shows: a resource address for a viewer, a page address otherwise. */
   readonly contentId: string

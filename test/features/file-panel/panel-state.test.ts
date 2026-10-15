@@ -10,7 +10,6 @@ import {
   levelFailed,
   levelLoaded,
   levelLoading,
-  pendingCount,
   setActive,
   setEnabled,
   setFilter,
@@ -108,20 +107,5 @@ describe('the small setters', () => {
     expect(setScroll(state, 0)).toBe(state)
     expect(setEnabled(state, true)).toBe(state)
     expect(setActive(state, '/w/a.ts')).toBe(state)
-  })
-})
-
-describe('pendingCount', () => {
-  it('counts the chain directories with no usable rows yet', () => {
-    let state = withRoot(createPanelState(true), '/w')
-    state = levelLoaded(state, '/w', [src], false)
-    expect(pendingCount(state, ['/w', '/w/src'])).toBe(1)
-    state = levelLoaded(state, '/w/src', [a], false)
-    expect(pendingCount(state, ['/w', '/w/src'])).toBe(0)
-  })
-
-  it('counts a failed level as not usable, since its rows never arrived', () => {
-    const state = levelFailed(levelLoading(createPanelState(true), '/w'), '/w', { code: 'gateway/internal' })
-    expect(pendingCount(state, ['/w'])).toBe(1)
   })
 })

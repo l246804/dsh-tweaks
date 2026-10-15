@@ -11,10 +11,14 @@
 import { describe, expect, it } from 'vitest'
 import { installListener } from '../src/client/dom/listeners.ts'
 import { STYLE_ELEMENT_MARKER } from '../src/client/dom/markers.ts'
-import { installStyles, ownedStyleElements } from '../src/client/dom/styles.ts'
-import { createDisposers } from '../src/client/effect.ts'
+import { installStyles } from '../src/client/dom/styles.ts'
 import { createFakeDom } from './helpers/dom.ts'
 import { createRecordingScope } from './helpers/scope.ts'
+
+/** Every style element the plugin owns in a document, found by its own marker. */
+function ownedStyleElements(document: ReturnType<typeof createFakeDom>['document']) {
+  return document.querySelectorAll(`[${STYLE_ELEMENT_MARKER}]`)
+}
 
 describe('plugin-owned styles', () => {
   it('installs one marked style element and removes exactly it', () => {
@@ -107,27 +111,41 @@ describe('uninstall leaves no residue', () => {
   })
 
   it('releases in reverse order, so a listener detaches before its node goes', () => {
+    // This is the property the recording scope every install test runs against
+    // has to hold: a resource registered later may depend on one registered
+    // earlier (a listener on a node), so release has to walk backwards.
     const released: string[] = []
-    const disposers = createDisposers()
-    disposers.add(() => released.push('first'))
-    disposers.add(() => released.push('second'))
-    disposers.add(() => released.push('third'))
+    const scope = createRecordingScope()
+    scope.effect(() => () => released.push('first'), 'first')
+    scope.effect(() => () => released.push('second'), 'second')
+    scope.effect(() => () => released.push('third'), 'third')
 
-    disposers.dispose()
+    scope.disposeAll()
 
     expect(released).toEqual(['third', 'second', 'first'])
-    expect(disposers.size()).toBe(0)
+    expect(scope.pending()).toBe(0)
   })
 
-  it('releases each member at most once', () => {
+  it('releases each member at most once, so a double dispose is harmless', () => {
     let calls = 0
-    const disposers = createDisposers()
-    disposers.add(() => {
+    const scope = createRecordingScope()
+    scope.effect(() => () => {
       calls += 1
-    })
-    disposers.dispose()
-    disposers.dispose()
+    }, 'once')
+    scope.disposeAll()
+    scope.disposeAll()
     expect(calls).toBe(1)
+  })
+
+  it('runs a disposer registered after teardown immediately, so nothing is stranded', () => {
+    let calls = 0
+    const scope = createRecordingScope()
+    scope.disposeAll()
+    scope.effect(() => () => {
+      calls += 1
+    }, 'late')
+    expect(calls).toBe(1)
+    expect(scope.pending()).toBe(0)
   })
 })
 

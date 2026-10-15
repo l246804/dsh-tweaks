@@ -1,9 +1,9 @@
 /**
- * Plugin-owned stylesheet installation. `ElementLike` and `DocumentLike` come from
- * the narrow DOM surface so the same code runs in the browser and in tests.
+ * Plugin-owned stylesheet installation. `DocumentLike` comes from the narrow DOM
+ * surface so the same code runs in the browser and in tests.
  */
 import type { Disposer } from '../effect.ts'
-import type { DocumentLike, ElementLike } from './types.ts'
+import type { DocumentLike } from './types.ts'
 import { STYLE_ELEMENT_MARKER } from './markers.ts'
 
 /**
@@ -29,13 +29,4 @@ export function installStyles(document: DocumentLike, css: string): Disposer {
     released = true
     style.remove()
   }
-}
-
-/**
- * Collect every plugin-owned stylesheet in a document.
- * @param document - the document to inspect.
- * @returns the matching style elements, in document order.
- */
-export function ownedStyleElements(document: DocumentLike): ElementLike[] {
-  return Array.from(document.querySelectorAll(`[${STYLE_ELEMENT_MARKER}]`))
 }

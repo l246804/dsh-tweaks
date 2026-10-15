@@ -24,7 +24,18 @@
  * check's project glob covers TypeScript files only, so a `.tsx` view would be
  * invisible to it, and the `react` dependency this file genuinely needs would be
  * reported as unused. One file's worth of `createElement` buys a truthful
- * dependency graph.
+ * dependency graph, and every user-interface module in this plugin makes the same
+ * choice, so that constraint has one answer rather than one per file.
+ *
+ * The markup carries two families of attribute, and the difference matters:
+ *
+ * - `data-dsh-tweaks-files-*` are this plugin's **own** markers. They name rows,
+ *   states, the scroller and the toolbar toggle, and they are what the plugin's
+ *   own later reads look up (`reveal.ts` finds a row this way).
+ * - `data-files-path` / `data-files-entry` are the **host's** own spelling,
+ *   reproduced because this view exists to be indistinguishable from the
+ *   built-in tree. They are part of the copied presentation rather than the
+ *   plugin's identity, so they carry no plugin prefix (see `dom/markers.ts`).
  *
  * @module @leiwang2000/dsh-tweaks/client/features/file-panel/view
  */
@@ -114,8 +125,8 @@ function rowElement(node: RowNode, view: PanelViewState): ReactNode {
     return createElement('li', {
       key,
       'className': 'note',
-      'data-dsh-files-note': row.note,
-      'data-dsh-files-path': row.path,
+      'data-dsh-tweaks-files-note': row.note,
+      'data-dsh-tweaks-files-path': row.path,
     }, noteText(row.note, failure, t))
   }
   const name = row.entry.name
@@ -126,14 +137,14 @@ function rowElement(node: RowNode, view: PanelViewState): ReactNode {
       'className': 'item',
       'data-files-entry': 'directory',
       'data-files-path': row.path,
-      'data-dsh-files-path': row.path,
+      'data-dsh-tweaks-files-path': row.path,
     }, [
       createElement('button', {
         'key': 'row',
         'type': 'button',
         'className': 'row',
         'aria-expanded': expanded,
-        'data-dsh-files-toggle': row.path,
+        'data-dsh-tweaks-files-toggle': row.path,
         'onClick': () => { view.onToggle(row.path) },
       }, [
         expanded
@@ -150,14 +161,14 @@ function rowElement(node: RowNode, view: PanelViewState): ReactNode {
       'className': 'item',
       'data-files-entry': 'file',
       'data-files-path': row.path,
-      'data-dsh-files-path': row.path,
+      'data-dsh-tweaks-files-path': row.path,
     }, createElement('button', {
       'type': 'button',
       'className': 'row',
       // The shell's tree has no active state; this is the panel's one addition,
       // and `aria-current` is the honest way to say "the tab shows this file".
       'aria-current': view.state.active === row.path ? 'true' : undefined,
-      'data-dsh-files-open': row.path,
+      'data-dsh-tweaks-files-open': row.path,
       'onClick': () => { view.onOpen(row.path) },
     }, [
       createElement(FileTypeIcon, { key: 'icon', kind: classifyFileType(name), size: 16, className: 'fileIcon' }),
@@ -169,7 +180,7 @@ function rowElement(node: RowNode, view: PanelViewState): ReactNode {
     'className': 'item',
     'data-files-entry': 'other',
     'data-files-path': row.path,
-    'data-dsh-files-path': row.path,
+    'data-dsh-tweaks-files-path': row.path,
   }, createElement('span', {
     'className': 'row other',
     'aria-disabled': 'true',
@@ -194,13 +205,13 @@ function rowsOf(state: PanelState): VisibleRow[] {
 export function PanelBody(view: PanelViewState): ReactNode {
   const { state, t } = view
   if (state.root === undefined) {
-    return createElement('div', { 'className': 'status', 'data-dsh-files-state': 'no-workspace' }, createElement('p', { className: 'statusLine' }, t('noWorkspace')))
+    return createElement('div', { 'className': 'status', 'data-dsh-tweaks-files-state': 'no-workspace' }, createElement('p', { className: 'statusLine' }, t('noWorkspace')))
   }
   const rows = rowsOf(state)
   return createElement('div', {
     'className': 'root',
-    'data-dsh-files-state': 'tree',
-    'data-dsh-files-root': state.root,
+    'data-dsh-tweaks-files-state': 'tree',
+    'data-dsh-tweaks-files-root': state.root,
   }, [
     // Inside the tab body, outside the tree's scroller: scrolling the tree must
     // not carry the filter away with it.
@@ -209,14 +220,14 @@ export function PanelBody(view: PanelViewState): ReactNode {
       'value': state.filter,
       'aria-label': t('filter.aria'),
       'placeholder': t('filter.placeholder'),
-      'data-dsh-files-filter': '',
+      'data-dsh-tweaks-files-filter': '',
       'onChange': (event: { currentTarget: { value: string } }) => { view.onFilter(event.currentTarget.value) },
     })),
     createElement('div', {
       'key': 'body',
       'className': 'body',
       [PANEL_SCROLL_ATTRIBUTE]: '',
-      'data-dsh-files-body': '',
+      'data-dsh-tweaks-files-body': '',
       'ref': (element: HTMLElement | null): void => {
         if (element === null)
           return
@@ -229,7 +240,7 @@ export function PanelBody(view: PanelViewState): ReactNode {
       },
       'onScroll': (event: { currentTarget: { scrollTop: number } }) => { view.onScroll(event.currentTarget.scrollTop) },
     }, rows.length === 0
-      ? createElement('ul', { className: 'level' }, createElement('li', { 'className': 'note', 'data-dsh-files-note': 'empty' }, t('empty')))
+      ? createElement('ul', { className: 'level' }, createElement('li', { 'className': 'note', 'data-dsh-tweaks-files-note': 'empty' }, t('empty')))
       : createElement('ul', { className: 'level' }, nestRows(rows).map(node => rowElement(node, view)))),
   ])
 }

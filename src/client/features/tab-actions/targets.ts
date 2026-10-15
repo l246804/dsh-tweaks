@@ -22,6 +22,7 @@
  */
 
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
+import type { TabHost } from '../../dom/dock-anchors.ts'
 
 /**
  * The tab kind the guide page is registered under.
@@ -32,8 +33,14 @@ import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
  */
 const GUIDE_KIND = 'guide'
 
-/** Where a tab is drawn: on the docked strip, or in an overlay pane of its own. */
-export type TabHost = 'dock' | 'float'
+/**
+ * Where a tab is drawn: on the docked strip, or in an overlay pane of its own.
+ *
+ * Re-exported from `dom/dock-anchors.ts`, because the two values are exactly the
+ * ones the kit writes into `data-dockkit-host`; naming them twice would let the
+ * type and the attribute drift apart.
+ */
+export type { TabHost } from '../../dom/dock-anchors.ts'
 
 /** One tab as this feature needs it: identity, kind, and where it stands. */
 export interface OrderedTab {

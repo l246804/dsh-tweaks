@@ -48,24 +48,6 @@ export function attributeSelector(attribute: string, value?: string): string {
 }
 
 /**
- * Build a selector matching an attribute whose value contains a substring.
- *
- * Used for hashed class suffixes, where only the stable `_local` tail of a
- * CSS-module class name is knowable across builds.
- * @param attribute - the attribute name.
- * @param fragment - the substring the value must contain.
- * @returns selector text such as `[class*="_openable"]`.
- * @throws {Error} when either argument is empty.
- */
-export function attributeContainsSelector(attribute: string, fragment: string): string {
-  if (attribute === '')
-    throw new Error('attributeContainsSelector: attribute name must not be empty')
-  if (fragment === '')
-    throw new Error('attributeContainsSelector: fragment must not be empty')
-  return `[${attribute}*="${escapeAttributeValue(fragment)}"]`
-}
-
-/**
  * Join selector parts into one compound selector.
  * @param parts - selector fragments, applied to the same element.
  * @returns the joined selector.

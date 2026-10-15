@@ -2,7 +2,7 @@
  * The panel's stylesheet, and the two layout facts it is responsible for.
  *
  * The tree's own numbers are the built-in tree's, copied value for value: a
- * reader who has used the shipped file list must not be able to tell that a
+ * reader who has used the shipped files tab must not be able to tell that a
  * plugin took the type over. The two additions are the ones the takeover needs
  * and the built-in tree never had:
  *

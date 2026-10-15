@@ -11,7 +11,7 @@
  *
  * The nodes are the shared stand-in's, not a second DOM implementation, so the
  * selectors `revealRow` builds (`[data-dsh-tweaks-file-panel-scroll]`, then rows
- * by `[data-dsh-files-path]`) run against the same DOM every other test uses.
+ * by `[data-dsh-tweaks-files-path]`) run against the same DOM every other test uses.
  *
  * One property is modelled deliberately: **the scroller outlives a redraw**.
  * React keeps the element and patches its children, so its offset survives a

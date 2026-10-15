@@ -2,9 +2,9 @@
  * `HostDom` over this plugin's shared DOM stand-in.
  *
  * The stand-in (`test/helpers/dom.ts`) is written against the plugin's narrow
- * `ElementLike` surface, which has no layout engine and no `closest`. The gaps
- * are closed here rather than by widening the shared helper, so these tests
- * state exactly which DOM abilities the panel depends on.
+ * `ElementLike` surface. The gaps are closed here rather than by widening the
+ * shared helper, so these tests state exactly which DOM abilities the panel
+ * depends on.
  *
  * Unlike the panel itself, this adapter never has to invent layout: the panel's
  * DOM work is structural (create, mark, move, detach), and the one operation that
@@ -31,19 +31,7 @@ export function fakeHostDom(dom: FakeDom): HostDom<FakeNode> {
     createElement: tag => dom.document.createElement(tag),
     append: (parent, child) => { parent.appendChild(child) },
     remove: (node) => { node.remove() },
-    parentOf: node => node.parentNode,
-    childrenOf: node => [...node.children] as FakeNode[],
     setAttribute: (node, name, value) => { node.setAttribute(name, value) },
     removeAttribute: (node, name) => { node.removeAttribute(name) },
-    getAttribute: (node, name) => node.getAttribute(name) ?? undefined,
-    ancestorWith(node, attribute) {
-      let current: FakeNode | undefined = node.parentNode
-      while (current !== undefined) {
-        if (current.getAttribute(attribute) !== null)
-          return current
-        current = current.parentNode
-      }
-      return undefined
-    },
   }
 }
