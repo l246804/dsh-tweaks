@@ -375,7 +375,7 @@ describe('the tab-actions menu', () => {
     expect(Object.keys(zh).sort()).toEqual(['menu.closeLeft', 'menu.closeOthers', 'menu.closeRight'])
     // The namespace is the same one the slot registrations declare, so a
     // translation and its row cannot drift onto different dictionaries.
-    expect(harness.registrations.every(entry => entry.locale === 'dsh-tweaks.tab-actions')).toBe(true)
+    expect(harness.registrations.every(entry => entry.locale === 'dshTweaksTabActions')).toBe(true)
   })
 
   it('labels every effect, so an unload is traceable to its owner', () => {

@@ -19,7 +19,12 @@ describe('selectors', () => {
   })
 
   it('escapes a quote so an exotic id cannot break out of the attribute value', () => {
-    expect(sidebarTabSelector('a"b')).toBe('[data-sidebar-right-tab="a\\"b"]')
+    // The panel's selectors go through the plugin's one escaping point
+    // (`dom/selector.ts`), which emits the CSS hex escape rather than a
+    // backslash-quote: both keep the value inside the quotes, and only one of
+    // them has to be re-derived here.
+    expect(sidebarTabSelector('a"b')).toBe('[data-sidebar-right-tab="a\\22 b"]')
+    expect(dockContentSelector('a\\b')).toBe('[data-dockkit-content="a\\5c b"]')
   })
 })
 

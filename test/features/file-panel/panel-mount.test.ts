@@ -134,7 +134,7 @@ describe('one panel, moved between tabs', () => {
       const list = fake.document.createElement('ul')
       for (const path of ['/w/src', '/w/a.ts']) {
         const row = fake.document.createElement('li')
-        row.setAttribute('data-dsh-files-path', path)
+        row.setAttribute('data-dsh-tweaks-files-path', path)
         list.appendChild(row)
       }
       scroller.appendChild(list)

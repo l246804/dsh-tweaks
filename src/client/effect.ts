@@ -26,34 +26,3 @@ export interface EffectScope {
    */
   effect: (body: () => Disposer, label?: string) => unknown
 }
-
-/**
- * Create a disposer collection that releases its members in reverse order.
- *
- * Reverse order matters for nested resources: a listener registered against a
- * node must be detached before the node itself is removed, or the detach lands
- * on an orphan.
- * @returns an object with `add`, `dispose` and `size`.
- */
-export function createDisposers(): {
-  add: (disposer: Disposer) => Disposer
-  dispose: () => void
-  readonly size: () => number
-} {
-  const members: Disposer[] = []
-  return {
-    add(disposer) {
-      members.push(disposer)
-      return disposer
-    },
-    dispose() {
-      // Splice as we go so a double dispose cannot release a member twice, and
-      // a throwing member cannot strand the ones after it.
-      while (members.length > 0) {
-        const disposer = members.pop()
-        disposer?.()
-      }
-    },
-    size: () => members.length,
-  }
-}

@@ -4,15 +4,13 @@
  * Every other module in this feature is written against an injected `HostDom` /
  * `DocumentLike` / `PreferenceStorage`, which is what lets the whole thing be
  * driven from a plain Node test. This is the single place that reaches for the
- * real globals, so the casts a real document needs are stated once, with their
- * reason, instead of appearing at a dozen call sites.
+ * real globals.
  *
- * The casts exist because the browser's own types are *wider* than the plugin's
- * surface in two harmless directions: `parentNode` is `ParentNode | null` where
- * the plugin expects `Element | undefined`, and `querySelectorAll` returns a
- * `NodeListOf` rather than an iterable of the plugin's own `ElementLike`. Both
- * are the same value at runtime: a null parent is an absent one, and a
- * `NodeListOf` is iterable, so narrowing them here loses nothing.
+ * The panel's `HostDom` is deliberately narrow (create, append, detach and the
+ * two attribute writers), so these adapters are short and need no casts at all.
+ * Where the browser's own types really are wider than the plugin's surface
+ * (`querySelectorAll` returns a non-iterable `NodeListOf`), the module that
+ * declares that wider requirement states it next to the call.
  *
  * @module @leiwang2000/dsh-tweaks/client/features/file-panel/browser-dom
  */
@@ -47,34 +45,24 @@ export function createBrowserHostDom(): HostDom<Element> {
     createElement: tag => document.createElement(tag),
     append: (parent, child) => { parent.appendChild(child) },
     remove: (node) => { node.remove() },
-    // A real node's parent is a `ParentNode`, which for an element's own child is
-    // always an element; the plugin's surface says `Element | undefined`, so the
-    // null and the union both collapse here.
-    parentOf: node => (node.parentNode ?? undefined) as Element | undefined,
-    childrenOf: node => [...node.children],
     setAttribute: (node, name, value) => { node.setAttribute(name, value) },
     removeAttribute: (node, name) => { node.removeAttribute(name) },
-    getAttribute: (node, name) => node.getAttribute(name) ?? undefined,
-    ancestorWith(node, attribute) {
-      let current: Element | null = node.parentElement
-      while (current !== null) {
-        if (current.getAttribute(attribute) !== null)
-          return current
-        current = current.parentElement
-      }
-      return undefined
-    },
   }
 }
 
 /**
  * Install the panel's stylesheet into the document head.
  *
- * Written here rather than reusing the shared `installStyles` so the narrow
- * `DocumentLike` cast stays in this file: the two are one operation, and having
- * the cast in a helper whose whole purpose is the cast is clearer than one that
- * appears to be about CSS injection. The marker attribute is the shared one, so
- * a test that looks for plugin-owned styles finds this element too.
+ * Written here rather than reusing the shared `installStyles` because the
+ * browser's own `Document` does not structurally satisfy the plugin's narrow
+ * `DocumentLike`: `DocumentLike.head` is an `ElementLike`, whose `parentNode` is
+ * `ElementLike | undefined`, while the real `head.parentNode` is
+ * `ParentNode | null`. Reusing the helper would therefore need a cast, and a cast
+ * belongs in the one module whose job is reaching for real globals, not at the
+ * call site of a helper that reads as being about CSS injection.
+ *
+ * The marker attribute is the shared one, so a test that looks for plugin-owned
+ * styles finds this element too.
  * @returns a disposer that detaches exactly this element.
  */
 export function installPanelStyles(css: string): Disposer {

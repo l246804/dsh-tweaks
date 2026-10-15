@@ -36,6 +36,20 @@
  * a DOM patch ("跨 tab 单一实例的面板"), and `docking.ts` states which stable
  * anchors it reads and why.
  *
+ * ## Fallback nature, and what would replace the page-patching half
+ *
+ * Everything past the two registrations below is a DOM patch under
+ * `docs/adr/0002-official-channels-first.md`: a stylesheet this plugin owns, a
+ * container appended into a tab body the preview plugin renders, and an observer
+ * of tab switches. Each of those names its own replacement where it is decided
+ * (`tab-anchor.ts` for the anchors, `docking.ts` for the watching, `toolbar.ts`
+ * for the seat it type-erases). What would delete *this* module's patch is a tab
+ * definition declaring a container the kit reserves beside the tab's content, or
+ * a pane-level slot the panel could register into: either would let the framework
+ * render the panel instead of this plugin moving it into place by hand. At that
+ * point `install` keeps the two registrations above and drops everything from
+ * `hasDocument()` down.
+ *
  * The seams its dependents fill in, both pure and both stable:
  * - `open-file.ts` (ticket #5): what opening a file row means;
  * - `activation.ts` (ticket #6): which file a tab shows, and when to scroll.
@@ -49,6 +63,7 @@ import type { DockingDocument } from './docking.ts'
 import type { HostDom } from './panel-host.ts'
 import type { PanelMount } from './panel-mount.ts'
 import { fileAddressFor } from '@deepseek-ai/dsh-util-workspace-path'
+import { isDockedTab } from '../../dom/dock-anchors.ts'
 import { createBrowserHostDom, deferToNextTask, hasDocument, installPanelStyles } from './browser-dom.ts'
 import { createPanelController } from './controller.ts'
 import { createDocking } from './docking.ts'
@@ -78,7 +93,7 @@ export function install(ctx: ClientContext): void {
   // Stage one: the type. An `extension` outranks the built-in `builtin` band for
   // the same kind, which is the documented way a type from outside the product
   // takes a built-in kind over. The guide entry restores the "Start" page's door
-  // to the file list, which disappears with the built-in entry.
+  // to the files tab, which disappears with the built-in entry.
   ctx.effect(() => ctx.sidebarRightTabs.register({
     id: FILES_ID,
     kind: FILES_KIND,
@@ -241,7 +256,7 @@ function openRow(ctx: ClientContext, root: string | undefined, path: string): vo
     current,
     open: ctx.sidebarRight.tabsIn(sessionId),
     canClose: () => true,
-    currentDocked: isDocked(ctx, current?.id),
+    currentDocked: isDocked(current?.id),
   })
   applyOpenFilePlan({
     openResource: (target, options) => {
@@ -258,19 +273,17 @@ function openRow(ctx: ClientContext, root: string | undefined, path: string): vo
 /**
  * Whether a tab sits in a docked pane, which is what makes it able to lend a slot.
  *
- * Read from the DOM because the layout record is not part of the public sidebar
- * face: the docking kit tags each tab's host with `data-dockkit-host`, and the
- * sidebar's own wrapper carries the tab id (`docking.ts` documents both anchors).
- * A tab the shell has not rendered has no host, and is treated as unable to lend
- * a slot, which is the conservative answer, since the fallback is a plain open.
- * @param ctx - the client root context.
+ * The answer is read from the DOM because the layout record is not part of the
+ * public sidebar face, and it is read through `dom/dock-anchors.ts` so the file
+ * panel and the tab actions share one reading of the kit's anchors rather than
+ * each spelling the attributes out. A tab the shell has not rendered has no
+ * host, which that module answers `false`: the conservative answer, since the
+ * fallback is a plain open.
  * @param tabId - the tab's id, or undefined when no tab is active.
  * @returns whether the tab is docked.
  */
-function isDocked(ctx: ClientContext, tabId: string | undefined): boolean {
-  void ctx
+function isDocked(tabId: string | undefined): boolean {
   if (tabId === undefined)
     return false
-  const host = document.querySelector(`[data-dockkit-content="${tabId}"]`)?.closest('[data-dockkit-host]')
-  return host?.getAttribute('data-dockkit-host') === 'dock'
+  return isDockedTab(document, tabId)
 }

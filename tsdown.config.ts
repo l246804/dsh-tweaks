@@ -1,5 +1,6 @@
 import { defineConfig } from 'tsdown'
 import { StaleGuardRecorder } from 'tsdown-stale-guard'
+import { PLATFORM_MODULES } from './scripts/platform-modules.mjs'
 
 /**
  * Plugin id: the package name, the bundle row name, and the client registration
@@ -7,31 +8,6 @@ import { StaleGuardRecorder } from 'tsdown-stale-guard'
  * the shell looks up the graph row by package name.
  */
 const ID = '@leiwang2000/dsh-tweaks'
-
-/**
- * Module-table specifiers the browser half may `require`. Mirrors the shell's
- * `PLATFORM_MODULES` seed table
- * (`deepseek-harness/packages/client/web/src/platform.ts`): every entry is a
- * module identity the shell shares, so a `require` of one returns the host's
- * single instance. A specifier outside this set must be bundled instead: the
- * module table cannot answer it, and `require` would throw at materialization.
- *
- * Copied as literal values rather than imported: the upstream module lives in
- * the read-only reference submodule, which this repository must never import.
- */
-const PLATFORM_MODULES: ReadonlySet<string> = new Set([
-  'react',
-  'react/jsx-runtime',
-  'react-dom',
-  'react-dom/client',
-  '@deepseek-ai/cordis',
-  'zod',
-  '@tanstack/react-virtual',
-  '@deepseek-ai/dsh-client-store',
-  '@deepseek-ai/dsh-client-ui-slots',
-  '@deepseek-ai/dsh-client-ui-primitives',
-  '@deepseek-ai/dsh-client-ui-dockkit',
-])
 
 /** The browser half's entry, and the published artifact name the loader requests. */
 const CLIENT_ENTRY = 'src/client/index.ts'

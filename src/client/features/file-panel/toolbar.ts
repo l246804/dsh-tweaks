@@ -89,7 +89,7 @@ function ToggleButton(options: ToggleOptions): ReactNode {
     'type': 'button',
     // The host's own toolbar classes carry a build hash and are not knowable
     // here; the attribute is what a reader can find and a test can assert.
-    'data-dsh-files-panel-toggle': '',
+    'data-dsh-tweaks-files-panel-toggle': '',
     'aria-pressed': enabled,
     'aria-label': t('panel.aria'),
     'title': enabled ? t('panel.hide') : t('panel.show'),

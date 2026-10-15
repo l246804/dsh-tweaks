@@ -7,8 +7,11 @@
  * synthesizes a translate function whose accepted keys are exactly this
  * dictionary's.
  *
- * Keys are lowercase and include English, matching how every other namespace in
- * the client is spelled.
+ * Keys are dotted, with a lower-case namespace segment and a camelCase leaf,
+ * matching how the host's own dictionaries are spelled (`chrome.collapseAria`,
+ * `dock.addTab`). The namespace itself is camelCase
+ * (`dshTweaksTabActions`), like this plugin's other two features' namespaces and
+ * like the host's own (`chat`, `sidebarRight`, `conversation`).
  *
  * @module @leiwang2000/dsh-tweaks/client/features/tab-actions/locales
  */
@@ -16,7 +19,7 @@
 import type {} from '@deepseek-ai/dsh-client-ui-slots'
 
 /** This feature's dictionary namespace. */
-export const NS = 'dsh-tweaks.tab-actions'
+export const NS = 'dshTweaksTabActions'
 
 /** Simplified Chinese dictionary, and the key-set source of truth. */
 export const zh = {
@@ -38,6 +41,6 @@ export const en = {
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
     /** Right-sidebar tab menu actions owned by this plugin. */
-    'dsh-tweaks.tab-actions': TabActionsKey
+    dshTweaksTabActions: TabActionsKey
   }
 }

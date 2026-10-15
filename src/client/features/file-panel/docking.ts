@@ -21,6 +21,22 @@
  * the interesting cases (no session, no active tab, a tab that is not rendered
  * yet) testable without a browser.
  *
+ * ## Fallback nature, and what replaces this module
+ *
+ * The watching half is a DOM patch under
+ * `docs/adr/0002-official-channels-first.md`, and it exists only because the
+ * placement it watches for cannot be learned from a service. The signals it
+ * collects (the open-tab inventory, the on-screen session, and a click or focus
+ * landing in the sidebar) are the best available proxies for "the kit has now
+ * rendered a different tab body"; a subscription that simply reported the
+ * rendered placement would replace all of them. Upstream already publishes the
+ * first two, so the seam to delete is narrow: add a placement source (a
+ * `sidebarRight` signal naming the tab on screen *and* the element its body was
+ * rendered as), and this module's `refresh`, its deferred resolve and its two
+ * gesture listeners all go with it, leaving `resolveDockTarget` as the only
+ * part worth keeping. Until then, the signals below are the seam to keep
+ * correct.
+ *
  * @module @leiwang2000/dsh-tweaks/client/features/file-panel/docking
  */
 

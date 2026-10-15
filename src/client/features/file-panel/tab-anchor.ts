@@ -56,56 +56,20 @@
  * @module @leiwang2000/dsh-tweaks/client/features/file-panel/tab-anchor
  */
 
-/** The attribute the docking kit tags each tab's host section with. */
-const DOCKKIT_CONTENT_ATTRIBUTE = 'data-dockkit-content'
-
-/** The attribute the right sidebar tags both of one tab's seats with. */
-const SIDEBAR_TAB_ATTRIBUTE = 'data-sidebar-right-tab'
-
 /**
- * The containers a tab's *title* seat can live inside, by the kit's own
- * attributes.
- *
- * The first two are the title boxes themselves: a strip chip wraps its label in
- * `[data-dockkit-tab-title]`, a floating pane's header wraps its in
- * `[data-dockkit-float-title]`. The other three are the chrome those boxes sit
- * in: a chip is `[data-dockkit-tab]`, a strip's chips live in
- * `[data-dockkit-strip-tabs]`, and a floating pane's header is
- * `[data-dockkit-float-grip]`. Any seat under one of them is the title, never
- * the body.
- *
- * The lower three are redundant today and kept on purpose: the body is the
- * sidebar's own wrapper *beside* the pane's chrome, so no body seat can be
- * inside a chip or a strip, and the check survives a rename of the innermost
- * title box as long as the chrome keeps its anchors. Being wrong the other way
- * is expensive (the panel would render inside a tab label), so the judgement
- * asks five questions instead of one.
+ * The anchor names, the selector text and the title-chrome list all come from
+ * `dom/dock-anchors.ts`, which is the single description of the kit's markup;
+ * the tab actions read the same attributes. What stays in this module is the one
+ * judgement only the panel needs: which of a tab's two seats is its body.
  */
-const TITLE_CONTAINER_SELECTORS = [
-  '[data-dockkit-tab-title]',
-  '[data-dockkit-float-title]',
-  '[data-dockkit-tab]',
-  '[data-dockkit-strip-tabs]',
-  '[data-dockkit-float-grip]',
-]
+import type { HostAnchoredElement } from '../../dom/dock-anchors.ts'
+import {
+  dockContentSelector,
+  sidebarTabSelector,
+  TITLE_CONTAINER_SELECTORS,
+} from '../../dom/dock-anchors.ts'
 
-/**
- * The selector for one tab's `<section>`, as the docking kit spells it.
- * @param tabId - the tab record's id.
- * @returns selector text.
- */
-export function dockContentSelector(tabId: string): string {
-  return `[${DOCKKIT_CONTENT_ATTRIBUTE}="${escapeAttribute(tabId)}"]`
-}
-
-/**
- * The selector for one tab's body wrapper, as the right sidebar spells it.
- * @param tabId - the tab record's id.
- * @returns selector text.
- */
-export function sidebarTabSelector(tabId: string): string {
-  return `[${SIDEBAR_TAB_ATTRIBUTE}="${escapeAttribute(tabId)}"]`
-}
+export { dockContentSelector, sidebarTabSelector }
 
 /**
  * The narrow query surface this module needs: a root whose `querySelector`
@@ -178,11 +142,6 @@ function bodySeatIn(section: Element, tabId: string): Element | undefined {
  * @param seat - one element carrying the tab id.
  * @returns whether the seat is a title.
  */
-function isTitleSeat(seat: Element): boolean {
+function isTitleSeat(seat: HostAnchoredElement): boolean {
   return TITLE_CONTAINER_SELECTORS.some(selector => seat.closest(selector) !== null)
-}
-
-/** Escape one value for the inside of a double-quoted attribute selector. */
-function escapeAttribute(value: string): string {
-  return value.replace(/(["\\])/gu, '\\$1')
 }

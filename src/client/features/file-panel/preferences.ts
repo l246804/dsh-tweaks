@@ -1,7 +1,7 @@
 /**
  * The panel's remembered preferences.
  *
- * One preference today: whether the file list is shown beside a file's content.
+ * One preference today: whether the file panel is shown beside a file's content.
  * The issue asks for it to be on by default and to survive a reload, which is
  * two different statements: the default is what a reader who has never chosen
  * gets, and "survives a reload" is a write the plugin must own.

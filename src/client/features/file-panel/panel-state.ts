@@ -164,22 +164,3 @@ export function setEnabled(state: PanelState, enabled: boolean): PanelState {
 export function setActive(state: PanelState, active: string | undefined): PanelState {
   return state.active === active ? state : { ...state, active }
 }
-
-/**
- * Count how many of a chain's directories have no usable listing yet.
- *
- * The activation seam waits for this to reach zero before scrolling: until then
- * the rows above the target keep arriving and the list keeps growing.
- * @param state - current state.
- * @param chain - the directories that must be open, outermost first.
- * @returns the number of directories still missing rows.
- */
-export function pendingCount(state: PanelState, chain: readonly string[]): number {
-  let pending = 0
-  for (const path of chain) {
-    const level = state.levels[path]
-    if (level === undefined || level.kind !== 'ready')
-      pending += 1
-  }
-  return pending
-}

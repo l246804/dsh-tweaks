@@ -7,11 +7,19 @@
  * than a promise, the alternative is a switch that quietly returns nothing for
  * a case nobody wired up.
  *
+ * What is asserted here is that *mapping*, never the sentences themselves. The
+ * wording is copy, the part of this feature an eye checks, and `AGENTS.md` is
+ * explicit that copy must not be gated on a test. So the tests below pin the
+ * properties a mapping can get wrong while a human keeps ownership of the
+ * prose: which outcome asks for which key, that the two languages differ, that
+ * neither dictionary is empty, and that nothing is returned when there is
+ * nothing to say.
+ *
  * @module @leiwang2000/dsh-tweaks/test/features/message-copy/notice
  */
 
 import type { MessageCopyKey } from '../../../src/client/features/message-copy/locales.ts'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { en, NS, zh } from '../../../src/client/features/message-copy/locales.ts'
 import { noticeText } from '../../../src/client/features/message-copy/notice.ts'
 
@@ -34,35 +42,56 @@ describe('notice copy', () => {
     expect(noticeText({ status: 'copied', attachmentsIncluded: true, omittedImages: 0 }, EN)).toBeUndefined()
   })
 
-  it('explains an unsupported host in the user\'s language', () => {
-    expect(noticeText({ status: 'text-only', reason: 'unsupported' }, ZH))
-      .toBe('仅复制了文字：浏览器不允许把附件写入剪贴板')
-    expect(noticeText({ status: 'text-only', reason: 'unsupported' }, EN))
-      .toBe('Copied text only: the browser would not put attachments on the clipboard')
+  it('explains an unsupported host by asking for the skipped-attachments key', () => {
+    // A seam, not a sentence: the translate seat is observed, so this fails if
+    // the mapping changes without the copy changing with it.
+    const t = vi.fn(EN)
+
+    const notice = noticeText({ status: 'text-only', reason: 'unsupported' }, t)
+
+    expect(t).toHaveBeenCalledWith('copy.attachmentsSkipped')
+    expect(notice).toBeDefined()
   })
 
-  it('explains a refused write, distinguishing it from an unsupported host', () => {
-    expect(noticeText({ status: 'text-only', reason: 'denied' }, ZH))
-      .toBe('仅复制了文字：浏览器不允许把附件写入剪贴板')
-    expect(noticeText({ status: 'text-only', reason: 'denied' }, EN))
-      .toBe('Copied text only: the browser would not put attachments on the clipboard')
+  it('explains a refused write through the same key, since the row cannot act differently', () => {
+    const t = vi.fn(EN)
+
+    const notice = noticeText({ status: 'text-only', reason: 'denied' }, t)
+
+    // Both reasons render one message on purpose: `notice.ts` maps the two to
+    // one key, and a test that demanded a distinct sentence per reason would be
+    // dictating copy rather than checking behaviour.
+    expect(t).toHaveBeenCalledWith('copy.attachmentsSkipped')
+    expect(notice).toBeDefined()
   })
 
-  it('explains a total failure instead of staying silent', () => {
-    expect(noticeText({ status: 'failed' }, ZH)).toBe('复制失败：浏览器拒绝了剪贴板写入')
-    expect(noticeText({ status: 'failed' }, EN)).toBe('Copy failed: the browser refused the clipboard write')
+  it('explains a total failure instead of staying silent, through the failure key', () => {
+    const t = vi.fn(EN)
+
+    const notice = noticeText({ status: 'failed' }, t)
+
+    expect(t).toHaveBeenCalledWith('copy.failed')
+    expect(notice).toBeDefined()
   })
 
   it('counts the images the clipboard could not hold, while reporting the copy as landed', () => {
-    const notice = noticeText({ status: 'copied', attachmentsIncluded: true, omittedImages: 2 }, EN)
+    const t = vi.fn(EN)
 
-    expect(notice).toBe('2 same-format image(s) did not fit on the clipboard')
+    const notice = noticeText({ status: 'copied', attachmentsIncluded: true, omittedImages: 2 }, t)
+
+    // The count reaches the translate seat as a parameter, which is the logic
+    // worth pinning: the sentence that interpolates it is copy.
+    expect(t).toHaveBeenCalledWith('copy.imagesOmitted', { count: 2 })
+    expect(notice).toBeDefined()
   })
 
   it('mentions an omitted image even when only one was left out', () => {
-    const notice = noticeText({ status: 'copied', attachmentsIncluded: true, omittedImages: 1 }, ZH)
+    const t = vi.fn(ZH)
 
-    expect(notice).toBe('有 1 张同格式图片无法放入剪贴板')
+    const notice = noticeText({ status: 'copied', attachmentsIncluded: true, omittedImages: 1 }, t)
+
+    expect(t).toHaveBeenCalledWith('copy.imagesOmitted', { count: 1 })
+    expect(notice).toBeDefined()
   })
 
   it('answers with copy for every non-landed outcome, so no case is wordless', () => {
@@ -74,19 +103,25 @@ describe('notice copy', () => {
     ] as const
 
     for (const outcome of outcomes) {
-      expect(typeof noticeText(outcome, EN)).toBe('string')
-      expect(noticeText(outcome, EN)?.length).toBeGreaterThan(0)
+      for (const dictionary of [EN, ZH]) {
+        const notice = noticeText(outcome, dictionary)
+        expect(typeof notice).toBe('string')
+        expect(notice?.length).toBeGreaterThan(0)
+      }
     }
   })
 
   it('keeps the two dictionaries in step, key for key', () => {
     expect(Object.keys(en).sort()).toEqual(Object.keys(zh).sort())
     expect(NS).toBe('dshTweaksMessageCopy')
-    // Every key the notice can ask for exists in both.
+    // Every key the notice can ask for exists in both, and the two say
+    // something different: a dictionary that fell back to the other language
+    // would pass a non-empty check while showing a reader the wrong one.
     const keys: MessageCopyKey[] = ['copy.attachmentsSkipped', 'copy.imagesOmitted', 'copy.failed']
     for (const key of keys) {
       expect(zh[key]).toBeTruthy()
       expect(en[key]).toBeTruthy()
+      expect(zh[key]).not.toBe(en[key])
     }
   })
 })

@@ -25,6 +25,13 @@
  *   the Factory's facts unchanged, because the host's text decoration reads
  *   them and a row that dropped them would render different text.
  *
+ * Written with `createElement` rather than JSX, like every other user-interface
+ * module in this plugin. The unused-dependency check's project glob covers
+ * `.ts` files only, so a `.tsx` module is invisible to it: an unused export
+ * there would go unreported. Keeping every UI module on `createElement` means
+ * the whole source tree is covered by the check as configured, rather than
+ * leaving a hole that only closing it would reveal.
+ *
  * @module @leiwang2000/dsh-tweaks/client/features/message-copy/row
  */
 
@@ -45,7 +52,7 @@ import {
   IconWarningOutlineRegular,
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createElement, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { formatMessageClock, msUntilNextLocalMidnight, startOfLocalDay } from './clock.ts'
 import { noticeText } from './notice.ts'
 import { messageContent } from './payload.ts'
@@ -114,6 +121,16 @@ function useCalendarDay(): number {
   return day
 }
 
+/** The props of the copy control's line under a message. */
+interface MessageCopyActionsProps {
+  /** The message's event time, rendered by the clock. */
+  readonly time: number
+  /** Starts a copy; resolves once the write settles. */
+  readonly copy: () => Promise<boolean>
+  /** The feature's own locale seat, which renders its labels. */
+  readonly t: (key: MessageCopyKey) => string
+}
+
 /**
  * The copy control with the clock beside it, under a message.
  *
@@ -127,15 +144,7 @@ function useCalendarDay(): number {
  * @param props.t - the feature's own locale seat, which renders its labels.
  * @returns the action line.
  */
-function MessageCopyActions({
-  time,
-  copy,
-  t,
-}: {
-  time: number
-  copy: () => Promise<boolean>
-  t: (key: MessageCopyKey) => string
-}): ReactNode {
+function MessageCopyActions({ time, copy, t }: MessageCopyActionsProps): ReactNode {
   const day = useCalendarDay()
   const [copied, setCopied] = useState(false)
   const pending = useRef(false)
@@ -167,20 +176,23 @@ function MessageCopyActions({
       }, COPIED_FEEDBACK_MS)
     })
   }, [copied, copy])
-  return (
-    <div className="dshTweaksMessageCopy-actions" data-clock="start">
-      <span className="dshTweaksMessageCopy-time">{formatMessageClock(time, t, day)}</span>
-      <Tooltip label={copied ? t('copied') : t('copy')} side="bottom">
-        <button
-          type="button"
-          className="dshTweaksMessageCopy-action"
-          aria-label={copied ? t('copied') : t('copy')}
-          onClick={onClick}
-        >
-          {copied ? <IconCheckOutlineRegular /> : <IconCopyOutlineRegular />}
-        </button>
-      </Tooltip>
-    </div>
+  return createElement(
+    'div',
+    { 'className': 'dshTweaksMessageCopy-actions', 'data-clock': 'start' },
+    createElement('span', { className: 'dshTweaksMessageCopy-time' }, formatMessageClock(time, t, day)),
+    createElement(
+      Tooltip,
+      {
+        label: copied ? t('copied') : t('copy'),
+        side: 'bottom',
+        children: createElement('button', {
+          'type': 'button',
+          'className': 'dshTweaksMessageCopy-action',
+          'aria-label': copied ? t('copied') : t('copy'),
+          'onClick': onClick,
+        }, copied ? createElement(IconCheckOutlineRegular) : createElement(IconCopyOutlineRegular)),
+      },
+    ),
   )
 }
 
@@ -254,29 +266,30 @@ export const MessageCopyRow = memo(({
     [content.attachments],
   )
 
-  return (
-    <div className="dshTweaksMessageCopy-row">
-      {renderFactorySlot('conversation.chat.user.content', {
-        content: {
-          text: content.text,
-          attachments,
-          extraBlocks: content.extraBlocks,
-          ...(data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels }),
-        },
-        loadImage,
-        facts,
-        interactive: true,
-      })}
-      <MessageCopyActions time={data.time} copy={onCopy} t={t} />
-      {notice !== undefined && (
-        // An inline notice rather than the host's floating Toast: the row is
-        // necessarily on screen when its copy runs, and an inline message
-        // cannot be missed by a user whose attention is on the message itself.
-        <div className="dshTweaksMessageCopy-notice" role="status">
-          <span aria-hidden><IconWarningOutlineRegular /></span>
-          {notice}
-        </div>
-      )}
-    </div>
+  return createElement(
+    'div',
+    { className: 'dshTweaksMessageCopy-row' },
+    renderFactorySlot('conversation.chat.user.content', {
+      content: {
+        text: content.text,
+        attachments,
+        extraBlocks: content.extraBlocks,
+        ...(data.referenceLabels === undefined ? {} : { referenceLabels: data.referenceLabels }),
+      },
+      loadImage,
+      facts,
+      interactive: true,
+    }),
+    createElement(MessageCopyActions, { time: data.time, copy: onCopy, t }),
+    // An inline notice rather than the host's floating Toast: the row is
+    // necessarily on screen when its copy runs, and an inline message cannot be
+    // missed by a user whose attention is on the message itself.
+    notice !== undefined
+    && createElement(
+      'div',
+      { className: 'dshTweaksMessageCopy-notice', role: 'status' },
+      createElement('span', { 'aria-hidden': true }, createElement(IconWarningOutlineRegular)),
+      notice,
+    ),
   )
 })

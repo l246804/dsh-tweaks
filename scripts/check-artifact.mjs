@@ -29,29 +29,9 @@ import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
+import { PLATFORM_MODULES } from './platform-modules.mjs'
 
 const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-
-/**
- * The module-table seed, mirroring the shell's `PLATFORM_MODULES`
- * (`deepseek-harness/packages/client/web/src/platform.ts`). Everything the
- * artifact may `require` must appear here; anything else means the build inlined
- * a dependency it should have kept external, or requested a row that does not
- * exist.
- */
-const PLATFORM_MODULES = new Set([
-  'react',
-  'react/jsx-runtime',
-  'react-dom',
-  'react-dom/client',
-  '@deepseek-ai/cordis',
-  'zod',
-  '@tanstack/react-virtual',
-  '@deepseek-ai/dsh-client-store',
-  '@deepseek-ai/dsh-client-ui-slots',
-  '@deepseek-ai/dsh-client-ui-primitives',
-  '@deepseek-ai/dsh-client-ui-dockkit',
-])
 
 /** Collect assertion failures instead of throwing on the first, so one run reports everything. */
 const failures = []

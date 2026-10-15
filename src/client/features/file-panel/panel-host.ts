@@ -34,7 +34,7 @@ export const PANEL_HOST_ATTRIBUTE = 'data-dsh-tweaks-file-panel-host'
 export const PANEL_SCROLL_ATTRIBUTE = 'data-dsh-tweaks-file-panel-scroll'
 
 /** The row marker: the absolute path each row stands for. */
-export const ROW_PATH_ATTRIBUTE = 'data-dsh-files-path'
+export const ROW_PATH_ATTRIBUTE = 'data-dsh-tweaks-files-path'
 
 /** How the panel sits in its host. */
 export type PanelMode
@@ -53,9 +53,14 @@ interface PanelLocation<Node> {
 
 /**
  * The DOM operations the host performs, written so the browser's own `Element`
- * satisfies every one of them. Purpose-specific names (`ancestorWith`) instead
- * of a generic selector engine keep the stand-in honest: it implements exactly
- * what the panel asks for, and a new request has to be added here on purpose.
+ * satisfies every one of them.
+ *
+ * Every member here is one the panel actually calls, and nothing more: the list
+ * is the panel's whole DOM budget, so a new request has to be added on purpose
+ * and a reader can see at a glance what this plugin does to the page (create,
+ * append, detach, and two attribute writers). Purpose-specific names rather than
+ * a generic selector engine keep the stand-in honest too: it implements exactly
+ * this list and refuses the rest.
  */
 export interface HostDom<Node> {
   /** Create one detached element. */
@@ -64,18 +69,10 @@ export interface HostDom<Node> {
   readonly append: (parent: Node, child: Node) => void
   /** Detach a node from its parent, if it has one. */
   readonly remove: (node: Node) => void
-  /** The node's parent, or undefined at a root or when detached. */
-  readonly parentOf: (node: Node) => Node | undefined
-  /** The node's children, in document order. */
-  readonly childrenOf: (node: Node) => readonly Node[]
   /** Write one attribute. */
   readonly setAttribute: (node: Node, name: string, value: string) => void
   /** Remove one attribute; an absent attribute is ignored. */
   readonly removeAttribute: (node: Node, name: string) => void
-  /** Read one attribute, or undefined when absent. */
-  readonly getAttribute: (node: Node, name: string) => string | undefined
-  /** The nearest ancestor of `node` carrying `attribute`, or undefined. */
-  readonly ancestorWith: (node: Node, attribute: string) => Node | undefined
 }
 
 /** The panel's DOM face. */

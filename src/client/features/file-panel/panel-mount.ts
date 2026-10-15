@@ -107,7 +107,7 @@ export interface PanelMount<Node> {
    */
   readonly dockInto: (element: Node, mode: PanelMode) => void
   /**
-   * Whether the file list is shown beside a file's content.
+   * Whether the file panel is shown beside a file's content.
    * @returns the current value.
    */
   readonly enabled: () => boolean
@@ -122,7 +122,7 @@ export interface PanelMount<Node> {
    */
   readonly subscribe: (listener: () => void) => () => void
   /**
-   * Show or hide the file list, remembering the choice.
+   * Show or hide the file panel, remembering the choice.
    * @param enabled - the new value.
    */
   readonly setEnabled: (enabled: boolean) => void
