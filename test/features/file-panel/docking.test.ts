@@ -85,6 +85,7 @@ function harness(initialTabs: readonly OpenTab[] = [filesTab, textTab]) {
   const sessionListeners = new Set<() => void>()
   const deferred: (() => void)[] = []
   const placed: { target: string | undefined, hasElement: boolean }[] = []
+  const placedElements: (unknown)[] = []
 
   const options: DockingOptions = {
     document: dom.document as never,
@@ -112,7 +113,10 @@ function harness(initialTabs: readonly OpenTab[] = [filesTab, textTab]) {
       },
     },
     defer: (work) => { deferred.push(work) },
-    place: (target, element) => { placed.push({ target: target?.tabId, hasElement: element !== undefined }) },
+    place: (target, element) => {
+      placed.push({ target: target?.tabId, hasElement: element !== undefined })
+      placedElements.push(element)
+    },
   }
 
   /** Run every deferred resolve, in order. */
@@ -130,12 +134,49 @@ function harness(initialTabs: readonly OpenTab[] = [filesTab, textTab]) {
     dom.document.body.appendChild(section)
   }
 
+  /** The title and body seats of each tab rendered the realistic way. */
+  const seats = new Map<string, { title: unknown, body: unknown }>()
+
+  /**
+   * Add one tab exactly as the shell renders it: a title seat inside the strip's
+   * chip, then the body seat, both carrying the tab id in that document order.
+   * @param tabId - the tab record's id.
+   */
+  const renderRealTab = (tabId: string): void => {
+    const section = dom.document.createElement('section')
+    section.setAttribute('data-dockkit-content', tabId)
+    const header = dom.document.createElement('div')
+    const stripTabs = dom.document.createElement('div')
+    stripTabs.setAttribute('data-dockkit-strip-tabs', 'pane-1')
+    const chip = dom.document.createElement('div')
+    chip.setAttribute('data-dockkit-tab', tabId)
+    const titleBox = dom.document.createElement('span')
+    titleBox.setAttribute('data-dockkit-tab-title', '')
+    const title = dom.document.createElement('span')
+    title.setAttribute('data-sidebar-right-tab', tabId)
+    titleBox.appendChild(title)
+    chip.appendChild(titleBox)
+    stripTabs.appendChild(chip)
+    header.appendChild(stripTabs)
+    const body = dom.document.createElement('div')
+    body.setAttribute('data-sidebar-right-tab', tabId)
+    section.appendChild(header)
+    section.appendChild(body)
+    dom.document.body.appendChild(section)
+    seats.set(tabId, { title, body })
+  }
+
+  const bodyOf = (tabId: string): unknown => seats.get(tabId)?.body
+  const titleOf = (tabId: string): unknown => seats.get(tabId)?.title
+
   return {
-    dom,
+    dom: { ...dom, bodyOf, titleOf },
     options,
     placed,
+    placedElements,
     flush,
     renderBody,
+    renderRealTab,
     deferredCount: () => deferred.length,
     /** Publish a new inventory and notify, as the sidebar's store does. */
     setInventory(next: readonly OpenTab[]) {
@@ -175,6 +216,24 @@ describe('the docking loop', () => {
     const docking = createDocking(h.options)
     h.flush()
     expect(h.placed).toEqual([{ target: 'tab-files', hasElement: true }])
+    docking.dispose()
+  })
+
+  it('hands the placer the tab body, not the chip title that carries the same id', () => {
+    // The one place the shell's real structure is exercised end to end. The
+    // sidebar tags the title seat and the body seat with the tab id, and the
+    // title comes first inside the section, so a placer handed "the first seat"
+    // would append the panel into the chip's label.
+    const h = harness()
+    h.renderRealTab('tab-files')
+    const docking = createDocking(h.options)
+    h.flush()
+
+    const element = h.placedElements.at(-1) as { getAttribute: (name: string) => string | null, tagName: string } | undefined
+    expect(element?.getAttribute('data-sidebar-right-tab')).toBe('tab-files')
+    expect(element?.tagName).toBe('DIV')
+    expect(h.dom.bodyOf('tab-files')).toBe(element)
+    expect(h.dom.titleOf('tab-files')).not.toBe(element)
     docking.dispose()
   })
 

@@ -21,14 +21,73 @@
  * re-render that replaces the body element is still found. Class names are never
  * used: they carry a build hash.
  *
+ * ## Why the sidebar anchor alone is not enough
+ *
+ * The sidebar writes `data-sidebar-right-tab` on **two** seats of one tab: the
+ * live chip title (`SidebarRight.tsx` renders a `<span>` for the
+ * `sidebar.right.pane.tab.title` seat) and the body (a `<div>` for the
+ * `sidebar.right.pane.tab` seat). Both seats are rendered under the one
+ * `[data-dockkit-content]` section, and the title comes first, because the kit's
+ * header precedes its body. A bare `querySelector` on that attribute therefore
+ * returns the chip's label, and appending the panel there would put a file tree
+ * inside a tab's title.
+ *
+ * The two seats are told apart by a second signal the host also writes itself:
+ * the title seat is always inside the kit's own title box
+ * (`[data-dockkit-tab-title]` for a strip chip, `[data-dockkit-float-title]` for
+ * a floating pane's header). This module therefore keeps the seat that is **not**
+ * under one of those, which is the body, rather than counting on a tag name or
+ * on header-before-body order. Both of those are true today and neither is
+ * promised; "inside the title box" is what the attribute means.
+ *
+ * ## Fallback nature, and what replaces this module
+ *
+ * This is a DOM patch under
+ * `docs/adr/0002-official-channels-first.md`, for the case it names: a panel
+ * that is one instance across several tabs cannot be rendered *by* the tab whose
+ * body it shares, because that body belongs to the preview plugin, and no
+ * official seat exists beside it. Delete this module when the host opens one:
+ * either a pane-level slot beside a tab's content (a `sidebar.right.pane`
+ * sibling seat rather than the per-tab `sidebar.right.pane.tab`), or a distinct
+ * body anchor such as a separate `data-sidebar-right-tab-body` attribute, or a
+ * tab definition declaring a container the kit reserves. Until then, the title
+ * signal above is the seam to keep correct.
+ *
  * @module @leiwang2000/dsh-tweaks/client/features/file-panel/tab-anchor
  */
 
 /** The attribute the docking kit tags each tab's host section with. */
 const DOCKKIT_CONTENT_ATTRIBUTE = 'data-dockkit-content'
 
-/** The attribute the right sidebar tags each tab body wrapper with. */
+/** The attribute the right sidebar tags both of one tab's seats with. */
 const SIDEBAR_TAB_ATTRIBUTE = 'data-sidebar-right-tab'
+
+/**
+ * The containers a tab's *title* seat can live inside, by the kit's own
+ * attributes.
+ *
+ * The first two are the title boxes themselves: a strip chip wraps its label in
+ * `[data-dockkit-tab-title]`, a floating pane's header wraps its in
+ * `[data-dockkit-float-title]`. The other three are the chrome those boxes sit
+ * in: a chip is `[data-dockkit-tab]`, a strip's chips live in
+ * `[data-dockkit-strip-tabs]`, and a floating pane's header is
+ * `[data-dockkit-float-grip]`. Any seat under one of them is the title, never
+ * the body.
+ *
+ * The lower three are redundant today and kept on purpose: the body is the
+ * sidebar's own wrapper *beside* the pane's chrome, so no body seat can be
+ * inside a chip or a strip, and the check survives a rename of the innermost
+ * title box as long as the chrome keeps its anchors. Being wrong the other way
+ * is expensive (the panel would render inside a tab label), so the judgement
+ * asks five questions instead of one.
+ */
+const TITLE_CONTAINER_SELECTORS = [
+  '[data-dockkit-tab-title]',
+  '[data-dockkit-float-title]',
+  '[data-dockkit-tab]',
+  '[data-dockkit-strip-tabs]',
+  '[data-dockkit-float-grip]',
+]
 
 /**
  * The selector for one tab's `<section>`, as the docking kit spells it.
@@ -49,8 +108,15 @@ export function sidebarTabSelector(tabId: string): string {
 }
 
 /**
- * The narrow query surface this module needs. `Document` and `Element` both
- * satisfy it, so the same code runs in the browser and in a test.
+ * The narrow query surface this module needs: a root whose `querySelector`
+ * returns a real element. `Document` satisfies it in the browser, and the
+ * test stand-in's document satisfies it too.
+ *
+ * The document is the scope, not the section: {@link findTabBody} finds the
+ * section *from* a root, so a scope that were the section itself would never
+ * match it. Inside the section this module then uses the element's own
+ * `querySelectorAll` and `closest`, which is why the root lookup has to yield a
+ * genuine `Element` rather than anything selector-shaped.
  */
 export interface AnchorScope {
   /**
@@ -64,21 +130,56 @@ export interface AnchorScope {
 /**
  * Find the element the panel should dock into for one tab.
  *
- * The sidebar's own wrapper is preferred when it exists, because it is the
- * element the tab's *content* is inside: docking there is what puts the panel
- * beside the file rather than beside the pane. The kit's section is the fallback,
- * and it is always present for a live record, so a panel is never left without a
- * home while its tab exists.
- * @param scope - the document or element to search.
+ * The kit's per-tab `<section>` is the spine: it exists for every rendered tab
+ * record, docked or floating, selected or not, and it is the only anchor that
+ * names *one tab* rather than one kind of seat. Inside it, the sidebar gives the
+ * tab id to both the chip's title seat and the body seat, so this picks the seat
+ * that is not a title (see the module note) and ignores the rest. The section
+ * itself is the fallback, which is also what a tab whose body is not mounted yet
+ * gets: docking at the pane level is wrong-looking for a frame but never puts the
+ * panel inside a label.
+ * @param scope - the document to search.
  * @param tabId - the tab record's id.
  * @returns the element to dock into, or undefined when the tab is not rendered.
  */
 export function findTabBody(scope: AnchorScope, tabId: string): Element | undefined {
-  const wrapper = scope.querySelector(sidebarTabSelector(tabId))
-  if (wrapper !== null && wrapper !== undefined)
-    return wrapper as Element
-  const section = scope.querySelector(dockContentSelector(tabId))
-  return section === null || section === undefined ? undefined : section as Element
+  const section = scope.querySelector(dockContentSelector(tabId)) as Element | null | undefined
+  if (section === null || section === undefined)
+    return undefined
+  return bodySeatIn(section, tabId) ?? section
+}
+
+/**
+ * Find one tab's body seat inside its own section.
+ *
+ * The first seat with the tab id that is not a title wins. A tab can render
+ * title and body, title alone (before its body is first visited) or body alone
+ * (a tab in a pane the kit does not draw chrome for), so this asks for the
+ * candidates rather than assuming either.
+ * @param section - the tab's `[data-dockkit-content]` section.
+ * @param tabId - the tab record's id.
+ * @returns the body seat, or undefined when the section holds none.
+ */
+function bodySeatIn(section: Element, tabId: string): Element | undefined {
+  for (const seat of section.querySelectorAll(sidebarTabSelector(tabId))) {
+    if (!isTitleSeat(seat))
+      return seat
+  }
+  return undefined
+}
+
+/**
+ * Whether a seat is the tab's *title* rather than its body.
+ *
+ * The sidebar writes the tab id on both, so the kit's own title chrome is what
+ * tells them apart. Walking up rather than testing the seat's own tag is
+ * deliberate: the tag is `<span>` today and that is a rendering detail, while
+ * "inside the title chrome" is what the seat being a title *means*.
+ * @param seat - one element carrying the tab id.
+ * @returns whether the seat is a title.
+ */
+function isTitleSeat(seat: Element): boolean {
+  return TITLE_CONTAINER_SELECTORS.some(selector => seat.closest(selector) !== null)
 }
 
 /** Escape one value for the inside of a double-quoted attribute selector. */

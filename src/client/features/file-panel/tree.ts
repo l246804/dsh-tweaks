@@ -90,7 +90,9 @@ function isUnder(path: string, ancestor: string): boolean {
  * @param expanded - the currently expanded paths.
  * @param levels - cached levels keyed by path.
  * @param parent - the directory whose listing was just applied.
- * @param entries - the listing's entries, after ordering.
+ * @param entries - the listing's entries, in the endpoint's own order. Ordering
+ * is a display concern and lives in {@link visibleRows}, so it is irrelevant
+ * here: this only reads which directory *names* are still present.
  * @returns the surviving expansion list, in its original order, and every path
  * dropped from either side: vanished directories and their descendants.
  */
@@ -159,12 +161,16 @@ export function visibleRows(
    */
   function walk(path: string, depth: number, announced: boolean): boolean {
     const level = levels[path]
-    const entries = level?.kind === 'ready' ? level.entries ?? [] : undefined
-    if (entries === undefined) {
+    const listed = level?.kind === 'ready' ? level.entries ?? [] : undefined
+    if (listed === undefined) {
       if (!announced)
         note(path, depth, level?.kind === 'failed' ? 'failed' : 'loading', level?.failure)
       return false
     }
+    // Ordering happens here, at the one place a level's entries become rows:
+    // every draw of a level (first paint, re-read, filtered search) passes
+    // through this function. The store keeps the endpoint's own order.
+    const entries = orderEntries(listed)
     // A failed refresh sits above rows that are still usable; both are shown.
     if (level?.failure !== undefined)
       note(path, depth, 'failed', level.failure)
