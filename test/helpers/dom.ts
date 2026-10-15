@@ -131,6 +131,22 @@ class FakeElement implements ElementLike {
     return matches
   }
 
+  /**
+   * Walk up from this element to the nearest ancestor matching a selector.
+   *
+   * A real `closest` accepts a full compound selector but not a descendant
+   * combination, and this one is the same: only the last part of a descendant
+   * selector could ever match an ancestor, and silently accepting the rest would
+   * hide a mistake in the selector a patch builds.
+   */
+  closest(selector: string): FakeElement | null {
+    const parts = selectorsOf(selector)
+    if (parts.length > 1) {
+      throw new Error(`fake-dom: closest() does not support descendant selectors, received ${JSON.stringify(selector)}`)
+    }
+    return closestFrom(this, parts[0]!)
+  }
+
   addEventListener(type: string, listener: (event: unknown) => void): void {
     this.listeners.add(type, listener)
   }
@@ -337,6 +353,17 @@ export function createFakeDom(): FakeDom {
       return installed
     },
   }
+}
+
+/** Walk up from one element to the nearest match, including that element. */
+function closestFrom(start: FakeElement, compound: CompoundSelector): FakeElement | null {
+  let current: FakeElement | null = start
+  while (current !== null) {
+    if (matchesCompound(current, compound))
+      return current
+    current = current.parentNode ?? null
+  }
+  return null
 }
 
 /** Reject a node that this stand-in did not create, rather than store a foreign shape. */

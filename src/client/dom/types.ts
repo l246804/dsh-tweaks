@@ -65,6 +65,16 @@ export interface ElementLike {
    */
   querySelectorAll: (selector: string) => Iterable<ElementLike>
   /**
+   * Find the nearest ancestor matching a selector, including this element.
+   *
+   * A patch that reads a property from a container needs this: the host tags
+   * the inner element with the identity and the outer one with the property, so
+   * the value is only reachable by walking up from the element in hand.
+   * @param selector - a CSS selector.
+   * @returns the nearest match, or null.
+   */
+  closest: (selector: string) => ElementLike | null
+  /**
    * Listen for an event.
    * @param type - the event type.
    * @param listener - the handler.

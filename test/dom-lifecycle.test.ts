@@ -186,3 +186,45 @@ describe('the DOM stand-in itself', () => {
     }
   })
 })
+
+describe('closest, for reading a property off an ancestor', () => {
+  it('finds the element itself when it matches', () => {
+    const { document } = createFakeDom()
+    const host = document.createElement('div')
+    host.setAttribute('data-dockkit-host', 'dock')
+    document.body.appendChild(host)
+    expect(host.closest('[data-dockkit-host]')).toBe(host)
+  })
+
+  it('walks up to the nearest matching ancestor, not the outermost', () => {
+    const { document } = createFakeDom()
+    const outer = document.createElement('div')
+    outer.setAttribute('data-dockkit-host', 'float')
+    const inner = document.createElement('div')
+    inner.setAttribute('data-dockkit-host', 'dock')
+    const section = document.createElement('section')
+    section.setAttribute('data-dockkit-content', 'tab-1')
+    outer.appendChild(inner)
+    inner.appendChild(section)
+    document.body.appendChild(outer)
+
+    // This is the shape the panel reads: an identity attribute on the inner
+    // element, the property it wants on the wrapping host.
+    const found = document.querySelector('[data-dockkit-content="tab-1"]')?.closest('[data-dockkit-host]')
+    expect(found).toBe(inner)
+    expect(found?.getAttribute('data-dockkit-host')).toBe('dock')
+  })
+
+  it('returns null when nothing on the way up matches', () => {
+    const { document } = createFakeDom()
+    const orphan = document.createElement('span')
+    document.body.appendChild(orphan)
+    expect(orphan.closest('[data-dockkit-host]')).toBeNull()
+  })
+
+  it('refuses a descendant selector rather than silently ignoring its first part', () => {
+    const { document } = createFakeDom()
+    const element = document.createElement('span')
+    expect(() => element.closest('div span')).toThrow(/does not support descendant selectors/)
+  })
+})
