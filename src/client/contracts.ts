@@ -43,6 +43,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-attachment/client'
 
 // --- The host data a feature reads ------------------------------------------
 
+// The chat node registry and renderer slots, declared by the package that
+// renders a message row.
+import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
 // The conversation surface: user text rules, and the chat node renderers a
 // feature replaces to reach a message's attachments.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -51,6 +54,9 @@ import type {} from '@deepseek-ai/dsh-client-ui-dockkit'
 // File-type classification and its icons, so the file tree stays visually
 // identical to the built-in one it replaces.
 import type {} from '@deepseek-ai/dsh-client-ui-primitives'
+// The renderer's slot and component contracts, which a feature's registered
+// component is typed against.
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // The right sidebar's navigation face and its tab-type registry, including the
 // `extension` priority band that may take over a built-in tab kind.
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
@@ -59,5 +65,14 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 // The workspace path helpers that turn a session-relative path into the
 // resource address the sidebar opens.
 import type {} from '@deepseek-ai/dsh-util-workspace-path'
+
+// --- The rendering surface the browser half is compiled against -------------
+
+// React and its DOM client are platform modules: the shell injects its own
+// single instances through the module table, and the plugin never ships a copy.
+// They are bound here as the compile-time contract for every registered
+// component and for the plugin-owned root it mounts its panel into.
+import type {} from 'react'
+import type {} from 'react-dom/client'
 
 export type { ClientContext }
