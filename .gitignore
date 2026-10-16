@@ -16,3 +16,6 @@ temp
 # Isolated DSH_HOME for end-to-end verification. Holds a throwaway profile and
 # its installed bundles; never committed.
 .verify-home
+
+# Throwaway investigation artifacts (screenshots, scratch venv). Never committed.
+.scratch

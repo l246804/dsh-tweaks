@@ -10,6 +10,11 @@
  * entries" and "unload cancels every subscription" assertions in a plain Node
  * test instead of claims about a browser.
  *
+ * The reload gesture is the same read as a change notification, deliberately:
+ * both go through `read`, so both keep the rows already on screen and neither
+ * invents a state the reader did not ask for. A reload is therefore the root's
+ * plain re-read, not a new subscription or an expansion.
+ *
  * @module @leiwang2000/dsh-tweaks/client/features/file-panel/controller
  */
 
@@ -119,6 +124,8 @@ export interface PanelController {
    * @returns the count.
    */
   readonly pending: (chain: readonly string[]) => number
+  /** Re-read the root directory, keeping the rows it already has. */
+  readonly reload: () => void
   /** Where a directory's rows stand, for the caller's own decisions. */
   readonly levelOf: (path: string) => PanelState['levels'][string] | undefined
   /** Every directory this controller currently watches. */
@@ -298,6 +305,20 @@ export function createPanelController(io: DirectoryIo): PanelController {
           count += 1
       }
       return count
+    },
+    reload() {
+      const root = state.root
+      // No root means no target to re-read: a reload before a session's cwd is
+      // known is a no-op rather than an error, because the button belongs to a
+      // tab whose root is always known, and a state invented here would only be
+      // a claim about a directory nobody named.
+      if (root === undefined)
+        return
+      // The plain re-read on the watch the root already has, so the rows stay
+      // while the listing is in flight and stay again if it fails. A root with no
+      // watch is deliberately not re-watched: membership is the expanded set, and
+      // `read` already answers that case by doing nothing.
+      read(root)
     },
     levelOf: path => state.levels[path],
     watched: () => [...watches.keys()],

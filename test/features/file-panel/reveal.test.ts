@@ -11,6 +11,13 @@
  * geometry (`measured-panel.ts`), because the panel's own DOM stand-in
  * deliberately has none, so without that tree nothing tests the module at all.
  *
+ * The third thing `revealRow` reports is *why* it did nothing, and the two
+ * answers are told apart here: a row that is not on screen (`absent`) is a "try
+ * again later" for the caller, while a row the scroller already holds
+ * (`settled`) is finished business. The mount's retry rule reads that
+ * difference, so a module that collapsed the two into `false` would leave it
+ * guessing.
+ *
  * @module @leiwang2000/dsh-tweaks/test/features/file-panel/reveal
  */
 
@@ -93,7 +100,7 @@ describe('revealRow', () => {
     const { tree, container } = panelTree()
     const target = manyPaths[20]!
 
-    expect(revealRow(container, target)).toBe(true)
+    expect(revealRow(container, target)).toBe('centred')
     // Row 20 sits at 8 + 20 * 38 = 768; 768 - (100 - 38) / 2 = 737.
     expect(tree.scroller()?.scrollTop).toBe(737)
     expect(centredFor(20, manyPaths.length)).toBe(737)
@@ -117,14 +124,14 @@ describe('revealRow', () => {
     // no-op cannot be mistaken for a successful clamp.
     tree.scroller()!.scrollTop = 300
 
-    expect(revealRow(container, '/w/a.ts')).toBe(true)
+    expect(revealRow(container, '/w/a.ts')).toBe('centred')
     expect(tree.scroller()?.scrollTop).toBe(0)
   })
 
   it('clamps the last row so a reveal never scrolls past the content', () => {
     const { tree, container } = panelTree()
     // The last row wants 958 - 31 = 927, but the scroller's range ends at 904.
-    expect(revealRow(container, manyPaths.at(-1)!)).toBe(true)
+    expect(revealRow(container, manyPaths.at(-1)!)).toBe('centred')
     expect(tree.scroller()?.scrollTop).toBe(904)
     expect(tree.scroller()!.scrollTop).toBe(tree.scroller()!.scrollHeight - VIEWPORT)
   })
@@ -144,25 +151,42 @@ describe('revealRow', () => {
     const target = manyPaths[20]!
 
     // A row whose offset differs is written once...
-    expect(revealRow(container, target)).toBe(true)
+    expect(revealRow(container, target)).toBe('centred')
     expect(writes).toHaveLength(1)
     // ...and asking again for the offset the scroller now holds writes nothing.
-    expect(revealRow(container, target)).toBe(false)
+    expect(revealRow(container, target)).toBe('settled')
     expect(writes).toHaveLength(1)
   })
 
   it('does nothing when the panel has no scroller yet', () => {
     const { document } = createFakeDom()
     const container = document.createElement('div')
-    expect(revealRow(asElement(container), '/w/a.ts')).toBe(false)
+    expect(revealRow(asElement(container), '/w/a.ts')).toBe('absent')
   })
 
   it('does nothing for a row that is not on screen, such as one under a collapsed directory', () => {
     const { tree, container } = panelTree(['/w/a.ts'])
     tree.scroller()!.scrollTop = 250
 
-    expect(revealRow(container, '/w/hidden.ts')).toBe(false)
+    expect(revealRow(container, '/w/hidden.ts')).toBe('absent')
     expect(tree.scroller()?.scrollTop).toBe(250)
+  })
+
+  it('tells "the row is not there yet" apart from "the row is already centred"', () => {
+    const { tree, container } = panelTree()
+    const target = manyPaths[20]!
+
+    // Both leave the scroller where it is, and only one of them means the caller
+    // is done. The mount retries on the first and stops on the second, so the two
+    // answers must not be the same value.
+    expect(revealRow(container, '/w/not-drawn.ts')).toBe('absent')
+    revealRow(container, target)
+    expect(revealRow(container, target)).toBe('settled')
+    // A scroller that cannot move at all is still "the row is there": the reveal
+    // found it and centring it happened to be a no-op, which is settled business.
+    const short = panelTree(['/w/only.ts'])
+    expect(revealRow(short.container, '/w/only.ts')).toBe('settled')
+    expect(tree.scroller()?.scrollTop).not.toBe(short.tree.scroller()?.scrollTop)
   })
 
   it('finds a row deep in the tree by its path, not by position', () => {
@@ -174,7 +198,7 @@ describe('revealRow', () => {
     const paths = ['/w/deep/a.ts', '/w/src/a.ts', ...manyPaths]
     tree.draw(container, paths)
 
-    expect(revealRow(asElement(container), '/w/src/a.ts')).toBe(true)
+    expect(revealRow(asElement(container), '/w/src/a.ts')).toBe('centred')
     // The second row's own place (8 + 38 = 46), not the first's: 46 - 31 = 15.
     expect(tree.scroller()?.scrollTop).toBe(15)
   })

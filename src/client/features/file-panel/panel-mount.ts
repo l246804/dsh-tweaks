@@ -22,6 +22,15 @@
  * of the instance's logic, and a plain Node test can drive a whole tab switch, an
  * activation and an unload while watching the container's identity.
  *
+ * That same seam is where the reveal's timing comes from. What `render` performs
+ * is a *request*: with React 18's `createRoot`, the rows appear when the commit
+ * runs, which is after `render` has returned. A reveal issued from
+ * `reconsiderReveal` would therefore search a container that does not hold the
+ * row yet, find nothing, and (because the key is remembered when the reveal is
+ * attempted) never try again. So the mount splits the decision from the attempt:
+ * the decision records the key, and {@link PanelMount.onRendered} runs the reveal
+ * at the one moment the row exists.
+ *
  * @module @leiwang2000/dsh-tweaks/client/features/file-panel/panel-mount
  */
 
@@ -30,6 +39,7 @@ import type { PanelController } from './controller.ts'
 import type { HostDom, PanelHost, PanelMode } from './panel-host.ts'
 import type { PanelState } from './panel-state.ts'
 import type { PreferenceStorage } from './preferences.ts'
+import type { RevealOutcome } from './reveal.ts'
 import type { SurfaceDecision } from './surface.ts'
 import { decideScroll } from './activation.ts'
 import { createPanelHost } from './panel-host.ts'
@@ -65,9 +75,9 @@ export interface PanelMountOptions<Node> {
    * rules worth pinning.
    * @param container - the panel's container element.
    * @param path - the absolute path of the row to centre.
-   * @returns whether anything moved.
+   * @returns what the attempt found and did; `absent` means "try again later".
    */
-  readonly reveal?: ((container: Node, path: string) => boolean) | undefined
+  readonly reveal?: ((container: Node, path: string) => RevealOutcome) | undefined
   /** Where the visibility preference is remembered; defaults to the browser's own storage. */
   readonly storage?: PreferenceStorage | undefined
 }
@@ -96,6 +106,15 @@ export interface PanelMount<Node> {
    * @param input - the tab's address and kind, the session, and the workspace root.
    */
   readonly show: (input: PanelShowInput) => void
+  /**
+   * Report that the renderer's last draw has been committed.
+   *
+   * The renderer calls this from the container ref, i.e. inside React's commit
+   * phase, when the rows the last view described are in the DOM and can be
+   * measured. It is what makes a deferred reveal land: see the module note on
+   * why the attempt cannot happen where the decision is made.
+   */
+  readonly onRendered: () => void
   /**
    * Offer the shell's tab body element as a home for the panel.
    *
@@ -148,6 +167,8 @@ export function createPanelMount<Node>(options: PanelMountOptions<Node>): PanelM
   let surfaceSession: SessionId | undefined
   /** The key the panel last revealed; `undefined` means "nothing revealed yet". */
   let revealedKey: string | undefined
+  /** The key a decision asked to reveal, waiting for the renderer to commit it. */
+  let pendingReveal: string | undefined
   /** The chain of the activation being revealed, so a later state change can finish it. */
   let chain: readonly string[] | undefined
   /** The last tab the shell reported, so toggling visibility can re-decide without a new report. */
@@ -168,9 +189,15 @@ export function createPanelMount<Node>(options: PanelMountOptions<Node>): PanelM
    *
    * Re-decided on every state change instead of scheduled: `activation.ts`
    * answers `wait` while any directory of the chain lacks rows, so this either
-   * reveals on the change that completes the chain or never reveals at all,
-   * which is the whole point of the wait. Drawing happens either way, because
-   * the view is what puts the row on screen for a reveal to find.
+   * decides to reveal on the change that completes the chain or never decides at
+   * all, which is the whole point of the wait. Drawing happens either way,
+   * because the view is what puts the row on screen for a reveal to find.
+   *
+   * The reveal itself is *recorded*, not run: the draw below is a request to the
+   * renderer, and the row it describes is not in the DOM until that render
+   * commits. {@link revealPending} is the other half, and the recording happens
+   * before the draw so that a renderer which commits synchronously (the shape a
+   * plain stub has) reaches it in its own commit callback.
    */
   const reconsiderReveal = (): void => {
     const key = controller.state().active
@@ -179,14 +206,36 @@ export function createPanelMount<Node>(options: PanelMountOptions<Node>): PanelM
       activeKey: key,
       pending: chain === undefined || chain.length === 0 ? 0 : controller.pending(chain),
     })
+    if (decision === 'scroll' && key !== undefined)
+      pendingReveal = key
     draw()
-    if (decision !== 'scroll' || key === undefined)
+  }
+
+  /**
+   * Run the reveal a decision asked for, now that the renderer has committed.
+   *
+   * `revealedKey` is set once the row was really found, moved or already centred
+   * (`centred` and `settled` alike), so an attempt that found nothing (the row
+   * the filter hides, or a commit that arrived before the rows did) leaves the
+   * request standing and is retried on the next commit instead of being written
+   * off. That is the fix for the tab-switch case: the commit that finally carries
+   * the rows is the one that reveals.
+   *
+   * A panel that is off the page, or filling a tab on its own, has nothing to
+   * centre, so the request is kept rather than dropped: it runs on the next
+   * commit after the panel is docked again.
+   */
+  const revealPending = (): void => {
+    const key = pendingReveal
+    if (key === undefined || host.location()?.mode !== 'dock')
       return
-    // Remembered before the attempt, not after: a row the filter hides will not
-    // appear on the next identical state change, and retrying on every render
-    // would fight a reader who scrolled away in the meantime.
+    if (options.reveal?.(host.container(), key) === 'absent')
+      return
+    // Found and handled: the request is spent. Leaving it in place would re-run
+    // the reveal on every later commit, which is exactly the "fights the reader"
+    // failure the reveal memory exists to prevent.
+    pendingReveal = undefined
     revealedKey = key
-    options.reveal?.(host.container(), key)
   }
 
   const unsubscribe = controller.subscribe(reconsiderReveal)
@@ -219,11 +268,15 @@ export function createPanelMount<Node>(options: PanelMountOptions<Node>): PanelM
         // A new activation target: the same file in another session is another
         // row, so the reveal memory starts over.
         revealedKey = undefined
+        pendingReveal = undefined
         controller.activate(decision.chain, decision.activeKey)
       }
       else {
         chain = undefined
         revealedKey = undefined
+        // No activation is being revealed any more, so a request left over from
+        // the tab that was on screen must not run against this one.
+        pendingReveal = undefined
         controller.activate([], undefined)
       }
     }
@@ -250,6 +303,7 @@ export function createPanelMount<Node>(options: PanelMountOptions<Node>): PanelM
       lastInput = input
       apply(input)
     },
+    onRendered: revealPending,
     dockInto(element, mode) {
       offered = { element, mode }
       if (lastInput === undefined)
@@ -281,6 +335,7 @@ export function createPanelMount<Node>(options: PanelMountOptions<Node>): PanelM
       surfaceSession = undefined
       chain = undefined
       revealedKey = undefined
+      pendingReveal = undefined
       lastInput = undefined
     },
   }

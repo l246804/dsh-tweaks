@@ -4,11 +4,14 @@
  *
  * The first two suites pin the *decision* and its call order, which is what the
  * layout cannot express: the same inputs must yield the same plan whatever the
- * sidebar does afterwards.
+ * sidebar does afterwards. The `planOpenFile` suite separates the two facts that
+ * gate a replacement on purpose: the *docked* half (a float lends no slot, the
+ * upstream degradation) and the *files page* half (only the pure file list lends
+ * its slot; a file tab with the panel docked in it must never be replaced).
  *
  * The third suite is the one the issue asks for by name. A decision is not what
  * a reader clicks: `openRow` in `index.ts` is, and it is the only place that
- * turns a tree row into those four inputs, including the one fact that is read
+ * turns a tree row into those inputs, including the one fact that is read
  * out of the page (`isDocked` walks from the kit's `data-dockkit-content`
  * section up to its `data-dockkit-host` cell). So those tests install the whole
  * feature over a drawn sidebar and click the row the panel's own renderer was
@@ -44,11 +47,13 @@ vi.mock('react-dom/client', () => ({
   }),
 }))
 
-// The view's icons classify files through the host's own package, whose runtime
-// dependencies are not installed in this Node test environment. This suite
-// never renders the view, so only its import has to resolve.
+// The view's icons come from the host's package, whose CSS-module and DOM
+// runtime dependencies do not load in this Node environment. This suite never
+// renders the view, so only the imports have to resolve: each icon is stubbed
+// to a component that draws nothing.
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   FileTypeIcon: () => null,
+  GuideArtworkFiles: () => null,
   IconFolderCloseRegular: () => null,
   IconFolderOpenRegular: () => null,
   IconWorkspaceTreeOutlineRegular: () => null,
@@ -73,19 +78,52 @@ const never = (): boolean => false
 const always = (): boolean => true
 
 describe('planOpenFile', () => {
-  it('replaces the current tab when the address is not open yet', () => {
+  it('replaces the file list tab when the address is not open yet', () => {
     const plan = planOpenFile({
       address: 'dsh-resource://file/session/s1/src/a.ts',
       current: filesTab,
       open: [filesTab],
       canClose: always,
       currentDocked: true,
+      currentIsFilesPage: true,
     })
     expect(plan).toEqual({
       kind: 'replace',
       address: 'dsh-resource://file/session/s1/src/a.ts',
       replaceTab: 'tab-files',
     })
+  })
+
+  it('opens in a tab of its own from a file tab, keeping the document on screen', () => {
+    // The regression this exists for: the panel docks *inside* a file tab, so
+    // `currentDocked` is true there too. Reading only that fact made every click
+    // replace the tab the reader was reading, which Q3 forbids. The files-page
+    // fact is what separates "lend my slot" from "keep my place".
+    const open = fileTab('tab-a', 'src/a.ts')
+    const plan = planOpenFile({
+      address: 'dsh-resource://file/session/s1/src/b.ts',
+      current: open,
+      open: [filesTab, open],
+      canClose: always,
+      currentDocked: true,
+      currentIsFilesPage: false,
+    })
+    expect(plan).toEqual({ kind: 'open', address: 'dsh-resource://file/session/s1/src/b.ts' })
+  })
+
+  it('opens rather than replaces when the docked tab is not the file list at all', () => {
+    // Same gate, stated without the files list in the open set: `currentDocked`
+    // alone is never enough, whatever the tab happens to be.
+    const other = { id: 'tab-term', kind: 'terminal', contentId: 'dsh-resource://terminal/s1' }
+    const plan = planOpenFile({
+      address: 'dsh-resource://file/session/s1/src/b.ts',
+      current: other,
+      open: [other],
+      canClose: always,
+      currentDocked: true,
+      currentIsFilesPage: false,
+    })
+    expect(plan).toEqual({ kind: 'open', address: 'dsh-resource://file/session/s1/src/b.ts' })
   })
 
   it('focuses an existing tab for the address and closes the current one', () => {
@@ -96,8 +134,27 @@ describe('planOpenFile', () => {
       open: [filesTab, target],
       canClose: always,
       currentDocked: true,
+      currentIsFilesPage: true,
     })
     expect(plan).toEqual({ kind: 'focus', focusTabId: 'tab-a', closeTabIds: ['tab-files'] })
+  })
+
+  it('focuses an existing tab without closing the file tab the panel sits in', () => {
+    // The files-page fact must not leak into the focus rule: a file tab is only
+    // ever replaced, never closed on someone else's behalf. It is closed here
+    // because the tab being focused is a different one, which is the unchanged
+    // rule for every acting tab.
+    const current = fileTab('tab-a', 'src/a.ts')
+    const target = fileTab('tab-b', 'src/b.ts')
+    const plan = planOpenFile({
+      address: target.contentId,
+      current,
+      open: [filesTab, current, target],
+      canClose: always,
+      currentDocked: true,
+      currentIsFilesPage: false,
+    })
+    expect(plan).toEqual({ kind: 'focus', focusTabId: 'tab-b', closeTabIds: ['tab-a'] })
   })
 
   it('keeps the current tab when the host cannot close it', () => {
@@ -108,6 +165,7 @@ describe('planOpenFile', () => {
       open: [filesTab, target],
       canClose: never,
       currentDocked: true,
+      currentIsFilesPage: true,
     })
     expect(plan).toEqual({ kind: 'focus', focusTabId: 'tab-a', closeTabIds: [] })
   })
@@ -120,17 +178,19 @@ describe('planOpenFile', () => {
       open: [current],
       canClose: always,
       currentDocked: true,
+      currentIsFilesPage: false,
     })
     expect(plan).toEqual({ kind: 'focus', focusTabId: 'tab-a', closeTabIds: [] })
   })
 
-  it('opens in a new tab when the current tab floats, because a float lends no slot', () => {
+  it('opens in a new tab when the file list floats, because a float lends no slot', () => {
     const plan = planOpenFile({
       address: 'dsh-resource://file/session/s1/src/a.ts',
       current: filesTab,
       open: [filesTab],
       canClose: always,
       currentDocked: false,
+      currentIsFilesPage: true,
     })
     expect(plan).toEqual({ kind: 'open', address: 'dsh-resource://file/session/s1/src/a.ts' })
   })
@@ -142,6 +202,7 @@ describe('planOpenFile', () => {
       open: [],
       canClose: always,
       currentDocked: false,
+      currentIsFilesPage: false,
     })
     expect(plan).toEqual({ kind: 'open', address: 'dsh-resource://file/session/s1/src/a.ts' })
   })
@@ -154,6 +215,7 @@ describe('planOpenFile', () => {
       open: [target],
       canClose: always,
       currentDocked: false,
+      currentIsFilesPage: false,
     })
     expect(plan).toEqual({ kind: 'focus', focusTabId: 'tab-a', closeTabIds: [] })
   })
@@ -166,6 +228,7 @@ describe('planOpenFile', () => {
       open: [filesTab, decoy],
       canClose: always,
       currentDocked: true,
+      currentIsFilesPage: true,
     })
     expect(plan.kind).toBe('replace')
   })
@@ -265,7 +328,7 @@ describe('opening a file from a row, through the installed feature', () => {
     scene.unload()
   })
 
-  it('call point B: switches the file tab it is docked in, leaving the panel where it is', async () => {
+  it('call point B: opens in a tab of its own from a file tab, never replacing the document', async () => {
     const scene = openRowScene({ ...base, activeTabId: 'tab-a' }, latestProps)
     // Let the panel dock into the file tab, which is what makes `isDocked` true.
     await scene.settle()
@@ -278,21 +341,24 @@ describe('opening a file from a row, through the installed feature', () => {
 
     scene.open('/w/src/b.ts')
 
+    // Q3's whole point: this tab is *docked*, so the old rule replaced it. But it
+    // is a file tab, not the file list, and the reader is reading the document in
+    // it, so the open must carry no `replaceTab` at all.
     expect(scene.calls.opened).toEqual([{
       via: 'openResourceIn',
       sessionId: 's1',
       address: address('src/b.ts'),
-      replaceTab: 'tab-a',
+      replaceTab: undefined,
     }])
     await scene.settle()
-    // The acting tab is replaced by the file it just opened, and the file list
-    // is untouched: the reader never leaves the tab they were reading in.
-    expect(scene.tabs().map(tab => tab.id)).toEqual(['tab-files', 'tab-n1'])
+    // The document the reader was reading survives, and the file it opened lands
+    // beside it. The file list is untouched too: nothing was replaced or closed.
+    expect(scene.tabs().map(tab => tab.id)).toEqual(['tab-files', 'tab-a', 'tab-n1'])
     expect(scene.calls.closed).toEqual([])
-    // And the panel is the same one, following the tab it was already in. A
-    // rebuild here would be invisible in the tree but would drop the expansion,
-    // the loaded levels and every directory subscription, which is exactly what
-    // the single-instance rule exists to prevent.
+    // The shell switches to the tab the open settled on, and the panel is the
+    // same one, following it. A rebuild here would be invisible in the tree but
+    // would drop the expansion, the loaded levels and every directory
+    // subscription, which is exactly what the single-instance rule prevents.
     expect(scene.containers()).toHaveLength(1)
     expect(scene.containers()[0]).toBe(container[0])
     expect(scene.homeTabId()).toBe('tab-n1')
@@ -396,10 +462,11 @@ describe('opening a file from a row, through the installed feature', () => {
     floating.unload()
   })
 
-  it('can open file after file without going back to the file list', async () => {
-    // The acceptance criterion is about a sequence, not one click: after the
-    // first replacement the acting tab is the file that just opened, and the
-    // next click must switch that same tab again rather than start a new one.
+  it('opens beside the file it just opened, because that tab is not the file list', async () => {
+    // The old acceptance criterion described every click reusing the file
+    // list's one slot, which Q3 deliberately gives up. After the first
+    // replacement the acting tab *is* the file that opened, and a file tab keeps
+    // its place, so the second click lands in a tab of its own.
     const scene = openRowScene(base, latestProps)
     await scene.settle()
 
@@ -408,17 +475,24 @@ describe('opening a file from a row, through the installed feature', () => {
     const [replacement] = scene.tabs().filter(tab => tab.id !== 'tab-a')
     expect(replacement).toBeDefined()
 
-    // The shell switches to the tab the open settled on, as the store does.
+    // The shell switches to the tab the open settled on, as the store does, and
+    // the panel follows it into a file tab.
     await scene.activate(replacement!.id)
     expect(scene.homeTabId()).toBe(replacement!.id)
+    expect(scene.homeMode()).toBe('dock')
+    expect(scene.activeTab().kind).toBe('text')
 
     scene.open('/w/src/c.ts')
     await scene.settle()
 
-    expect(scene.calls.opened.map(entry => entry.replaceTab)).toEqual(['tab-files', replacement!.id])
-    // Two files opened from two clicks in one slot: the list's slot is still
-    // the only one they ever used, and the `a.ts` tab was never disturbed.
-    expect(scene.tabs().map(tab => tab.id)).toEqual(['tab-n2', 'tab-a'])
+    // The list's slot was used once, by the first click; the second click opened
+    // plainly. Nothing was replaced a second time and nothing was closed.
+    expect(scene.calls.opened.map(entry => entry.replaceTab)).toEqual(['tab-files', undefined])
+    expect(scene.calls.closed).toEqual([])
+    // Three tabs: the list is gone (replaced in its own slot, first in the
+    // strip), and both opened files are on screen. The first one never gave up
+    // its place to the second.
+    expect(scene.tabs().map(tab => tab.id)).toEqual(['tab-n1', 'tab-a', 'tab-n2'])
     scene.unload()
   })
 })

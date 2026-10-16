@@ -359,3 +359,99 @@ describe('the pending count a reveal waits on', () => {
     expect(observed.every(entry => entry.pending === 0)).toBe(true)
   })
 })
+
+describe('reloading the root', () => {
+  it('re-reads the root directory and shows the new listing', async () => {
+    let calls = 0
+    const fake = fakeIo({
+      '/w': () => {
+        calls += 1
+        return { ok: true, value: { entries: calls === 1 ? [a] : [a, src], truncated: false } }
+      },
+    })
+    const panel = createPanelController(fake.io)
+    panel.setTarget(sessionId('s1'), '/w')
+    await settle()
+    expect(fake.lists).toEqual(['s1:/w'])
+
+    panel.reload()
+    await settle()
+
+    // One more read of the same directory, on the subscription it already has:
+    // a reload is a re-read, not a second watch.
+    expect(fake.lists).toEqual(['s1:/w', 's1:/w'])
+    expect(fake.opens).toEqual(['s1:/w'])
+    expect(panel.levelOf('/w')).toEqual({ kind: 'ready', entries: [a, src], truncated: false })
+  })
+
+  it('keeps the rows already on screen when the reload fails, and reports the failure', async () => {
+    // The same rule the change stream follows, checked through the other door:
+    // a reload that fails must not blank a tree the reader is looking at.
+    let calls = 0
+    const fake = fakeIo({
+      '/w': () => {
+        calls += 1
+        return calls === 1
+          ? { ok: true, value: { entries: [a], truncated: false } }
+          : { ok: false, error: { code: 'gateway/internal', message: 'gone' } }
+      },
+    })
+    const panel = createPanelController(fake.io)
+    panel.setTarget(sessionId('s1'), '/w')
+    await settle()
+
+    panel.reload()
+    await settle()
+
+    const level = panel.levelOf('/w')
+    expect(level?.kind).toBe('ready')
+    expect(level?.kind === 'ready' ? level.entries : []).toEqual([a])
+    expect(level?.kind === 'ready' ? level.failure : undefined).toEqual({ code: 'gateway/internal', message: 'gone' })
+  })
+
+  it('does nothing at all before a root is known', () => {
+    const fake = fakeIo()
+    const panel = createPanelController(fake.io)
+    panel.reload()
+    expect(fake.lists).toEqual([])
+    expect(fake.opens).toEqual([])
+  })
+
+  it('does not resurrect a root whose subscription was dropped', async () => {
+    // Watch membership *is* the expanded set, so a reload must not start a
+    // subscription the reader just collapsed away. The read silently has no
+    // watch to run on, and the state keeps the root it still names.
+    const fake = fakeIo({ '/w': { ok: true, value: { entries: [src], truncated: false } } })
+    const panel = createPanelController(fake.io)
+    panel.setTarget(sessionId('s1'), '/w')
+    await settle()
+    panel.toggle('/w')
+    expect(fake.aborted.has('/w')).toBe(true)
+
+    panel.reload()
+    await settle()
+
+    expect(fake.lists).toEqual(['s1:/w'])
+    expect(fake.opens).toEqual(['s1:/w'])
+    expect(panel.state().root).toBe('/w')
+  })
+
+  it('re-reads the root of the session it is now pointed at', async () => {
+    // The gesture has no path of its own: it reloads whatever tree is on screen,
+    // which is the point of it being one button.
+    const fake = fakeIo({
+      '/w': { ok: true, value: { entries: [src], truncated: false } },
+      '/other': { ok: true, value: { entries: [a], truncated: false } },
+    })
+    const panel = createPanelController(fake.io)
+    panel.setTarget(sessionId('s1'), '/w')
+    await settle()
+    panel.setTarget(sessionId('s2'), '/other')
+    await settle()
+
+    panel.reload()
+    await settle()
+
+    expect(fake.lists).toEqual(['s1:/w', 's2:/other', 's2:/other'])
+  })
+})

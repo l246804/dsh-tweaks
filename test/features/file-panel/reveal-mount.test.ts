@@ -24,7 +24,7 @@
 
 import type { WorkspaceDirectoryEntry } from '@deepseek-ai/dsh-api-workspace-files/types'
 import type { DirectoryIo, ListOutcome } from '../../../src/client/features/file-panel/controller.ts'
-import type { PanelRenderer, PanelView } from '../../../src/client/features/file-panel/panel-mount.ts'
+import type { PanelMount, PanelRenderer, PanelView } from '../../../src/client/features/file-panel/panel-mount.ts'
 import type { FakeNode } from './fake-host-dom.ts'
 import { describe, expect, it } from 'vitest'
 import { createPanelController } from '../../../src/client/features/file-panel/controller.ts'
@@ -159,14 +159,19 @@ async function mount(levels: Levels) {
     rowHeight: ROW_HEIGHT,
     padding: PADDING,
   })
+  // Declared before the renderer because the renderer's commit callback reaches
+  // the mount: drawing the rows and reporting the commit are one step here, which
+  // is what a synchronous stub does.
+  let mount: PanelMount<FakeNode>
   // The view's own flattening, so what is drawn is what the state says.
   const render: PanelRenderer<FakeNode> = (container, view: PanelView) => {
     const rows = view.state.root === undefined
       ? []
       : visibleRows(view.state.root, view.state.levels, view.state.expanded, view.state.filter)
     tree.draw(container, rows.map(row => row.path))
+    mount.onRendered()
   }
-  const mount = createPanelMount<FakeNode>({
+  mount = createPanelMount<FakeNode>({
     dom: fakeHostDom(fake),
     controller,
     render,

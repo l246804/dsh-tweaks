@@ -166,6 +166,38 @@ function harness(initialTabs: readonly OpenTab[] = [filesTab, textTab]) {
     seats.set(tabId, { title, body })
   }
 
+  /**
+   * Add the preview root inside one already-rendered tab's body, the way the
+   * preview plugin mounts into the sidebar's seat.
+   * @param tabId - the tab record's id.
+   * @returns the preview root.
+   */
+  const renderPreviewRoot = (tabId: string): unknown => {
+    const body = seats.get(tabId)?.body as { appendChild: (child: unknown) => void }
+    const preview = dom.document.createElement('div')
+    preview.setAttribute('data-textpreview-state', 'text')
+    const toolbar = dom.document.createElement('div')
+    const path = dom.document.createElement('span')
+    path.setAttribute('data-textpreview-path', '')
+    toolbar.appendChild(path)
+    const content = dom.document.createElement('div')
+    content.setAttribute('data-textpreview-body', '')
+    preview.appendChild(toolbar)
+    preview.appendChild(content)
+    body.appendChild(preview)
+    return preview
+  }
+
+  /**
+   * Add one file tab whose body already holds a preview root.
+   * @param tabId - the tab record's id.
+   * @returns the preview root, which is what a docked panel should land in.
+   */
+  const renderPreviewTab = (tabId: string): unknown => {
+    renderRealTab(tabId)
+    return renderPreviewRoot(tabId)
+  }
+
   const bodyOf = (tabId: string): unknown => seats.get(tabId)?.body
   const titleOf = (tabId: string): unknown => seats.get(tabId)?.title
 
@@ -177,6 +209,8 @@ function harness(initialTabs: readonly OpenTab[] = [filesTab, textTab]) {
     flush,
     renderBody,
     renderRealTab,
+    renderPreviewTab,
+    renderPreviewRoot,
     deferredCount: () => deferred.length,
     /** Publish a new inventory and notify, as the sidebar's store does. */
     setInventory(next: readonly OpenTab[]) {
@@ -234,6 +268,55 @@ describe('the docking loop', () => {
     expect(element?.tagName).toBe('DIV')
     expect(h.dom.bodyOf('tab-files')).toBe(element)
     expect(h.dom.titleOf('tab-files')).not.toBe(element)
+    docking.dispose()
+  })
+
+  it('hands the placer the preview root for a file tab, not the wrapper that also holds the toolbar', () => {
+    // A docked panel belongs under the preview's toolbar row, not beside it, so
+    // the element handed over is the preview's own root. The sidebar's body seat
+    // would put the panel next to the toolbar, which is the placement #6 reports.
+    const h = harness()
+    const preview = h.renderPreviewTab('tab-a')
+    h.setActiveTab({ id: tabId('tab-a'), kind: 'text', contentId: textTab.contentId })
+    const docking = createDocking(h.options)
+    h.flush()
+
+    const element = h.placedElements.at(-1)
+    expect(element).toBe(preview)
+    expect(h.dom.bodyOf('tab-a')).not.toBe(element)
+    docking.dispose()
+  })
+
+  it('hands the placer the sidebar seat for the file-list page, where no preview root exists', () => {
+    const h = harness()
+    h.renderRealTab('tab-files')
+    const docking = createDocking(h.options)
+    h.flush()
+
+    expect(h.placedElements.at(-1)).toBe(h.dom.bodyOf('tab-files'))
+    docking.dispose()
+  })
+
+  it('re-resolves when the same tab renders a different host element, so the panel moves into it', () => {
+    // A file tab's body is the sidebar's seat at first, and the preview root
+    // appears *inside* it once the preview mounts. The target never changed, but
+    // the element did, and the panel has to move to the new one rather than stay
+    // beside the toolbar row.
+    const h = harness()
+    h.renderRealTab('tab-a')
+    h.setActiveTab({ id: tabId('tab-a'), kind: 'text', contentId: textTab.contentId })
+    const docking = createDocking(h.options)
+    h.flush()
+    const seat = h.dom.bodyOf('tab-a')
+    expect(h.placedElements.at(-1)).toBe(seat)
+    expect(h.placed).toHaveLength(1)
+
+    // The preview mounts, and the next signal re-resolves.
+    const preview = h.renderPreviewRoot('tab-a')
+    h.dom.document.dispatchEvent({ type: 'click' })
+    h.flush()
+    expect(h.placedElements.at(-1)).toBe(preview)
+    expect(h.placed).toHaveLength(2)
     docking.dispose()
   })
 

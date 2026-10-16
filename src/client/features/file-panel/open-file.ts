@@ -4,10 +4,15 @@
  * A file row in the panel can mean three different things, and the choice is a
  * pure function of what is already open:
  *
- * - the address is not open anywhere → take the current tab's slot and close it
- *   in the same step (`replaceTab`), which is the official "replace in place"
- *   ability: the file lands where the file-list tab was, and no second tab
- *   appears;
+ * - the address is not open anywhere **and the acting tab is the pure file list
+ *   page** → take that tab's slot and close it in the same step (`replaceTab`),
+ *   which is the official "replace in place" ability: the file lands where the
+ *   file-list tab was, and no second tab appears. That is the built-in files
+ *   tab's own behaviour and it is kept;
+ * - the address is not open anywhere **and the acting tab is a file tab** → a
+ *   plain open. The panel is docked beside a file the reader is reading; taking
+ *   that tab's slot would throw the document away from under them, so the panel
+ *   only ever opens or focuses, never replaces (Q3);
  * - the address is already open elsewhere → focus that tab and close the current
  *   one. The host has no single API for that pair (sidebar notes §2.4:
  *   `revealIfOpened` reveals but does not close the caller), so the plan spells
@@ -17,6 +22,12 @@
  *   tab and lends no slot, so `replaceTab` cannot mean anything there; the host's
  *   own store treats the request as unplaced, and this seam says so explicitly
  *   rather than relying on that.
+ *
+ * The "pure file list page" fact is an input (`currentIsFilesPage`) rather than
+ * something read off `current.kind` here, because naming the files kind is the
+ * entry module's business: this file must stay free of the panel's own
+ * vocabulary, so `index.ts` answers that question where it already imports
+ * `FILES_KIND`.
  *
  * **Generic over the tab-id type, and that is the whole trick.** The host brands
  * its ids (`TabId` is `string & { [BRAND] }`), and `openResourceIn`/`focus`/
@@ -68,15 +79,24 @@ export interface OpenFileInput<Id extends string = string> {
    * replacement degrades to a plain open there, which is the upstream behaviour.
    */
   readonly currentDocked: boolean
+  /**
+   * Whether the current tab is the pure file list page (`kind === 'files'`).
+   *
+   * Only that page lends its slot: a file tab holding a docked panel is docked
+   * too, and replacing it would close the document the reader is reading. The
+   * two facts are separate on purpose, since a files page can float and a file
+   * tab can dock, so both are needed to answer "replace or open".
+   */
+  readonly currentIsFilesPage: boolean
 }
 
 /**
  * Decide how to open one file from the panel.
- * @param input - the address, the acting tab, the open set, and the two facts about the current tab.
+ * @param input - the address, the acting tab, the open set, and the three facts about the current tab.
  * @returns the plan to hand to {@link applyOpenFilePlan}.
  */
 export function planOpenFile<Id extends string>(input: OpenFileInput<Id>): OpenFilePlan<Id> {
-  const { address, current, open, canClose, currentDocked } = input
+  const { address, current, open, canClose, currentDocked, currentIsFilesPage } = input
   const existing = open.find(tab => tab.contentId === address)
   if (existing !== undefined) {
     // Same tab: nothing to reveal and nothing to close. Saying so keeps the
@@ -86,7 +106,10 @@ export function planOpenFile<Id extends string>(input: OpenFileInput<Id>): OpenF
       : []
     return { kind: 'focus', focusTabId: existing.id, closeTabIds }
   }
-  if (current !== undefined && currentDocked)
+  // Both facts are required: only a docked *file list* lends its slot. Any
+  // other acting tab (a file tab with the panel docked in it) keeps its place,
+  // and the open lands in a tab of its own.
+  if (current !== undefined && currentDocked && currentIsFilesPage)
     return { kind: 'replace', address, replaceTab: current.id }
   return { kind: 'open', address }
 }

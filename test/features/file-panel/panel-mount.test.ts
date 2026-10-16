@@ -21,12 +21,13 @@
  */
 
 import type { DirectoryIo } from '../../../src/client/features/file-panel/controller.ts'
-import type { PanelRenderer, PanelView } from '../../../src/client/features/file-panel/panel-mount.ts'
+import type { PanelMount, PanelRenderer, PanelView } from '../../../src/client/features/file-panel/panel-mount.ts'
 import type { FakeNode } from './fake-host-dom.ts'
 import { describe, expect, it } from 'vitest'
 import { createPanelController } from '../../../src/client/features/file-panel/controller.ts'
 import { PANEL_HOST_ATTRIBUTE } from '../../../src/client/features/file-panel/panel-host.ts'
 import { createPanelMount } from '../../../src/client/features/file-panel/panel-mount.ts'
+import { visibleRows } from '../../../src/client/features/file-panel/tree.ts'
 import { createFakeDom } from '../../helpers/dom.ts'
 import { fakeHostDom } from './fake-host-dom.ts'
 import { sessionId } from './ids.ts'
@@ -54,18 +55,24 @@ async function mount(levels: Record<string, { name: string, type: 'file' | 'dire
   const dom = fakeHostDom(fake)
   const controller = createPanelController(fakeIo(levels))
   const views: PanelView[] = []
-  const render: PanelRenderer<FakeNode> = (_container, view) => {
-    views.push(view)
-  }
   const revealed: string[] = []
   const written: string[] = []
-  const mount = createPanelMount({
+  // The renderer is built before the mount (index.ts does the same), and the
+  // commit signal is what tells the mount the rows it asked for exist. A stub
+  // commits synchronously, which is the timing shape `reveal-mount.test.ts`
+  // deliberately departs from.
+  let mount: PanelMount<FakeNode>
+  const render: PanelRenderer<FakeNode> = (_container, view) => {
+    views.push(view)
+    mount.onRendered()
+  }
+  mount = createPanelMount({
     dom,
     controller,
     render,
     reveal: (_container, path) => {
       revealed.push(path)
-      return true
+      return 'centred'
     },
     storage: {
       getItem: () => null,
@@ -294,6 +301,129 @@ describe('revealing the active file', () => {
     expect(h.controller.state().active).toBeUndefined()
     expect(h.mount.host()).toBeUndefined()
     expect(h.revealed).toEqual([])
+  })
+})
+
+/**
+ * The reveal when the renderer commits *later*, which is the shape React 18 puts
+ * the real one in.
+ *
+ * The rest of this file mounts a renderer that draws and signals its commit in
+ * the same call, and every claim it makes about reveal timing is true of that
+ * shape and only that shape. What `createRoot().render()` performs is a *request*
+ * rather than a commit, and the rows arrive when React performs it. So the two
+ * moments are driven apart by hand here (`render` records what to draw, and the
+ * test performs the draw later, exactly as React would), and the claim is that
+ * the reveal still happens.
+ *
+ * That a reveal issued between the two moments finds nothing is not a bug to
+ * assert; it is the premise. The row is genuinely not in the DOM yet. What is
+ * under test is what the mount does with that: it must keep the request and run
+ * it at the commit, rather than write the activation off as revealed and never
+ * look again.
+ */
+describe('revealing when the renderer commits later', () => {
+  /** The address of one file in session `s1`, rooted at `/w`. */
+  const address = (path: string): string => `dsh-resource://file/session/s1/${path}`
+
+  /**
+   * A mount whose renderer defers its draw, and the handle that performs it.
+   *
+   * The deferred draw really does put rows in the DOM: it records exactly the
+   * paths the view would render (`visibleRows`, the same flattening the real
+   * view uses), and `reveal` answers from that record the way `revealRow`'s
+   * `querySelector` answers from the document.
+   * @param levels - what each directory lists.
+   * @returns the mount, its bodies, the revealed keys and the commit handle.
+   */
+  function lateRenderMount(levels: Record<string, { name: string, type: 'file' | 'directory' | 'other' }[]>) {
+    const fake = createFakeDom()
+    const controller = createPanelController(fakeIo(levels))
+    /** Perform the draw the renderer last requested, or undefined when none is. */
+    let awaitingDraw: (() => void) | undefined
+    /** The paths the committed DOM holds. */
+    const drawn = new Set<string>()
+    const revealed: string[] = []
+    let mount: PanelMount<FakeNode> | undefined
+
+    const render: PanelRenderer<FakeNode> = (_container, view) => {
+      // `render` only *requests* a commit; the rows are not in the DOM until the
+      // test performs it, which is the whole point of this shape.
+      awaitingDraw = () => {
+        drawn.clear()
+        if (view.state.root !== undefined) {
+          for (const row of visibleRows(view.state.root, view.state.levels, view.state.expanded, view.state.filter))
+            drawn.add(row.path)
+        }
+        // The view's ref callback, which is how React reports the commit.
+        mount?.onRendered()
+      }
+    }
+    mount = createPanelMount<FakeNode>({
+      dom: fakeHostDom(fake),
+      controller,
+      render,
+      // Answers from the drawn rows, like `revealRow`'s query does.
+      reveal: (_container, path) => {
+        if (!drawn.has(path))
+          return 'absent'
+        revealed.push(path)
+        return 'centred'
+      },
+      storage: { getItem: () => null, setItem: () => {} },
+    })
+    const body = bodyMaker(fake)
+
+    return {
+      mount,
+      body,
+      revealed,
+      /** Perform the draw the renderer deferred, as React's commit would. */
+      commit(): void {
+        const work = awaitingDraw
+        awaitingDraw = undefined
+        work?.()
+      },
+      /** Whether a draw is waiting to be committed. */
+      pendingDraw: (): boolean => awaitingDraw !== undefined,
+    }
+  }
+
+  it('reveals at the commit, after a synchronous attempt would have found nothing', async () => {
+    const h = lateRenderMount({ '/w': [src], '/w/src': [b] })
+    h.mount.show({ sessionId: sessionId('s1'), workspaceRoot: '/w', address: address('src/b.ts'), kind: 'text' })
+    h.mount.dockInto(h.body('file-1'), 'dock')
+    await settle()
+
+    // The chain has settled and the renderer has been asked to draw, but the
+    // commit has not run, so the row is not in the DOM: there is nothing to
+    // reveal yet, and the mount must not treat the activation as done.
+    expect(h.pendingDraw()).toBe(true)
+    expect(h.revealed).toEqual([])
+
+    h.commit()
+    // The commit carries the row, and the reveal runs there. A mount that had
+    // attempted the reveal when it decided to would have found nothing, written
+    // the activation off, and left the reader where they were.
+    expect(h.revealed).toEqual(['/w/src/b.ts'])
+  })
+
+  it('retries at the next commit when the row is still not drawn', async () => {
+    const h = lateRenderMount({ '/w': [src], '/w/src': [b] })
+    h.mount.show({ sessionId: sessionId('s1'), workspaceRoot: '/w', address: address('src/b.ts'), kind: 'text' })
+    h.mount.dockInto(h.body('file-1'), 'dock')
+    await settle()
+    expect(h.pendingDraw()).toBe(true)
+
+    // A commit in which the row is not there (the filter hides it, or the level
+    // landed after this draw was requested). The request must survive it.
+    h.revealed.length = 0
+    h.mount.onRendered()
+    expect(h.revealed).toEqual([])
+
+    // The commit that does carry the row reveals.
+    h.commit()
+    expect(h.revealed).toEqual(['/w/src/b.ts'])
   })
 })
 

@@ -1,24 +1,34 @@
 /**
- * The panel's view: the filter row, the tree, and the states in between.
+ * The panel's view: the page header, the filter row, the tree, and the seam.
  *
  * The markup and class names are the built-in tree's, term for term, because the
  * whole point of taking the `files` kind over is that a reader cannot tell it
- * happened. Two things are the panel's own:
+ * happened. What is the panel's own:
  *
- * - the **filter row**, which the built-in tree does not have, and which sits
- *   above the scroller rather than inside it so the tree's scrolling cannot
- *   carry it away;
+ * - the **page header**, the built-in tab's 38px row (root path, then reload).
+ *   It exists only where the panel *is* the tab; docked beside a file, the
+ *   file's own toolbar row is already that row and a second one would be a
+ *   duplicate. That difference is the whole of `view.docked`'s meaning.
+ * - the **filter row**, below the header when there is one and above the
+ *   scroller always, so the tree's scrolling cannot carry it away. It is the
+ *   shared `Input` primitive rather than a hand-written `<input>`: this is the
+ *   product's own single-line field, so it already carries the theme's border,
+ *   focus ring and placeholder ink.
+ * - the **resize seam**, the drag handle on the panel's left edge. Only where
+ *   the panel is docked: a width means nothing when the panel is the whole tab.
  * - the **active row**, marked `aria-current`, for the file the active tab is
- *   showing. The built-in tree has no such notion, because it only ever lived
- *   in the tab it was opened from.
+ *   showing. The built-in tree has no such notion, because it only ever lived in
+ *   the tab it was opened from.
  *
- * Icons and file classification come from `@deepseek-ai/dsh-client-ui-primitives`
- * (the same module the built-in tree draws with, and one of the shell's own
- * module-table rows), so the glyphs are the same objects rather than copies.
+ * Icons, the path label, the input and file classification come from
+ * `@deepseek-ai/dsh-client-ui-primitives` (the same module the built-in tree
+ * draws with, and one of the shell's own module-table rows), so the glyphs are
+ * the same objects rather than copies.
  *
- * The view holds no state: the filter's text, the expansion and the loaded
- * levels all live in the controller one layer up, which is what makes them
- * survive the container being moved between tabs.
+ * The view holds no state: the filter's text, the expansion, the loaded levels
+ * and the panel's width all live one layer down (the controller, and
+ * `resizer.ts`'s module-level drag registry), which is what makes them survive
+ * the container being moved between tabs.
  *
  * Written with `createElement` rather than JSX deliberately. The unused-dependency
  * check's project glob covers TypeScript files only, so a `.tsx` view would be
@@ -30,8 +40,8 @@
  * The markup carries two families of attribute, and the difference matters:
  *
  * - `data-dsh-tweaks-files-*` are this plugin's **own** markers. They name rows,
- *   states, the scroller and the toolbar toggle, and they are what the plugin's
- *   own later reads look up (`reveal.ts` finds a row this way).
+ *   states, the scroller, the reload button and the seam, and they are what the
+ *   plugin's own later reads look up (`reveal.ts` finds a row this way).
  * - `data-files-path` / `data-files-entry` are the **host's** own spelling,
  *   reproduced because this view exists to be indistinguishable from the
  *   built-in tree. They are part of the copied presentation rather than the
@@ -50,10 +60,33 @@ import {
   FileTypeIcon,
   IconFolderCloseRegular,
   IconFolderOpenRegular,
+  IconRefreshOutlineRegular,
+  IconSearchOutlineRegular,
+  Input,
+  PathLabel,
+  Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
-import { createElement } from 'react'
+import { createElement, useMemo } from 'react'
 import { PANEL_SCROLL_ATTRIBUTE } from './panel-host.ts'
+import { createPanelResizer, PANEL_RESIZER_ATTRIBUTE } from './resizer.ts'
 import { nestRows, visibleRows } from './tree.ts'
+
+/**
+ * Add the plugin's own `data-*` markers to a primitive's props.
+ *
+ * The primitives' prop types are closed interfaces, so an unknown property is a
+ * compile error even though React writes it to the DOM verbatim; the plugin
+ * still wants its own markers on the two primitives it renders (`PathLabel` and
+ * `Input`), because the stylesheet may only select this plugin's attributes, not
+ * the host's hashed class names. The helper keeps that one widening in one place
+ * and keeps the call sites ordinary property lists.
+ * @param props - the primitive's own props.
+ * @param markers - the plugin's markers, written onto the element.
+ * @returns the props, plus the markers.
+ */
+function marked<P extends object>(props: P, markers: Record<`data-${string}`, string>): P {
+  return { ...props, ...markers }
+}
 
 /** Everything the view draws from; a snapshot of the controller's state. */
 export interface PanelViewState {
@@ -76,6 +109,16 @@ export interface PanelViewState {
    * can bring the active row into view. Fires once per arrival, not per render.
    */
   readonly onScrollerReady: (scroller: HTMLElement) => void
+  /**
+   * Whether the panel is docked beside a file (`true`) or is the whole file-list
+   * tab (`false`).
+   *
+   * The one thing it decides is the page header: docked, the file's own toolbar
+   * row already sits above the panel, so the panel draws none.
+   */
+  readonly docked: boolean
+  /** Re-read the current root directory. Only the page form has a button for it. */
+  readonly onReload: () => void
 }
 
 /**
@@ -198,11 +241,103 @@ function rowsOf(state: PanelState): VisibleRow[] {
 }
 
 /**
+ * The file-list tab's 38px row: the root path, then reload at its end.
+ *
+ * A copy of the built-in tab's header rather than a new design, including the
+ * tooltip the shipped button carries; the shortcut keys the built-in one shows
+ * come from its own tab record, which this plugin's type has none of.
+ * @param view - the snapshot and the callbacks.
+ * @returns the header row.
+ */
+function headerElement(view: PanelViewState): ReactNode {
+  const { state, t } = view
+  return createElement('div', { key: 'header', className: 'header' }, [
+    createElement(PathLabel, marked({
+      key: 'path',
+      path: state.root ?? '',
+      className: 'path',
+    }, { 'data-files-path': '' })),
+    createElement(Tooltip, {
+      key: 'reload',
+      label: t('reload'),
+      side: 'bottom',
+      delayMs: 500,
+      children: createElement('button', {
+        'type': 'button',
+        'className': 'tool',
+        'aria-label': t('reload'),
+        'data-dsh-tweaks-files-reload': '',
+        'onClick': () => { view.onReload() },
+      }, createElement(IconRefreshOutlineRegular, { key: 'icon' })),
+    }),
+  ])
+}
+
+/**
+ * The filter row: the shared `Input`, spanning the row.
+ *
+ * The primitive is the product's own field, so its border, focus ring and
+ * placeholder ink are the ones every other search box in the shell has. Its
+ * wrapper (the element `className` would land on) is a hashed CSS-module name
+ * this plugin cannot select, so the row is a one-column grid and the field fills
+ * the track by being its only item.
+ * @param view - the snapshot and the callbacks.
+ * @returns the filter row.
+ */
+function filterElement(view: PanelViewState): ReactNode {
+  const { t } = view
+  return createElement('div', { key: 'filter', className: 'filter' }, createElement(Input, marked({
+    'icon': createElement(IconSearchOutlineRegular, { key: 'icon', size: 16 }),
+    'type': 'search',
+    'value': view.state.filter,
+    'aria-label': t('filter.aria'),
+    'placeholder': t('filter.placeholder'),
+    'onChange': (event: { currentTarget: { value: string } }) => { view.onFilter(event.currentTarget.value) },
+  }, { 'data-dsh-tweaks-files-filter': '' })))
+}
+
+/**
+ * The seam: the panel's left edge, which the reader drags to set its width.
+ *
+ * The shape is the trajectory panel's details handle: a focusable
+ * `role="separator"`, pointer capture for the drag, a double click to reset and
+ * arrow keys to step. Its size and appearance come from the stylesheet, which
+ * builds it the way the docking kit's own divider is built. The handlers come
+ * from `resizer.ts`, which owns the arithmetic; this file only puts them on an
+ * element.
+ * @param resizer - the bound gesture.
+ * @param view - the snapshot and the callbacks.
+ * @returns the seam.
+ */
+function resizerElement(resizer: ReturnType<typeof createPanelResizer>, view: PanelViewState): ReactNode {
+  return createElement('div', {
+    'key': 'resizer',
+    'className': 'resizer',
+    'role': 'separator',
+    'aria-orientation': 'vertical',
+    'aria-label': view.t('resize.aria'),
+    'tabIndex': 0,
+    [PANEL_RESIZER_ATTRIBUTE]: '',
+    'ref': resizer.onReady,
+    'onPointerDown': resizer.onPointerDown,
+    'onPointerMove': resizer.onPointerMove,
+    'onPointerUp': resizer.onPointerUp,
+    'onPointerCancel': resizer.onPointerCancel,
+    'onDoubleClick': resizer.onDoubleClick,
+    'onKeyDown': resizer.onKeyDown,
+  })
+}
+
+/**
  * Draw the panel.
  * @param view - the snapshot and the callbacks.
  * @returns the panel's markup.
  */
 export function PanelBody(view: PanelViewState): ReactNode {
+  // One gesture per mounted panel, and none of them holds the drag: `resizer.ts`
+  // keeps live drags keyed by the handle element, so a re-render that replaces
+  // the handle cannot lose one in progress.
+  const resizer = useMemo(() => createPanelResizer(), [])
   const { state, t } = view
   if (state.root === undefined) {
     return createElement('div', { 'className': 'status', 'data-dsh-tweaks-files-state': 'no-workspace' }, createElement('p', { className: 'statusLine' }, t('noWorkspace')))
@@ -213,16 +348,12 @@ export function PanelBody(view: PanelViewState): ReactNode {
     'data-dsh-tweaks-files-state': 'tree',
     'data-dsh-tweaks-files-root': state.root,
   }, [
+    // The page's own header, and only the page's: docked, the file's toolbar row
+    // above the panel is that row already.
+    !view.docked && headerElement(view),
     // Inside the tab body, outside the tree's scroller: scrolling the tree must
     // not carry the filter away with it.
-    createElement('div', { key: 'filter', className: 'filter' }, createElement('input', {
-      'type': 'search',
-      'value': state.filter,
-      'aria-label': t('filter.aria'),
-      'placeholder': t('filter.placeholder'),
-      'data-dsh-tweaks-files-filter': '',
-      'onChange': (event: { currentTarget: { value: string } }) => { view.onFilter(event.currentTarget.value) },
-    })),
+    filterElement(view),
     createElement('div', {
       'key': 'body',
       'className': 'body',
@@ -242,5 +373,8 @@ export function PanelBody(view: PanelViewState): ReactNode {
     }, rows.length === 0
       ? createElement('ul', { className: 'level' }, createElement('li', { 'className': 'note', 'data-dsh-tweaks-files-note': 'empty' }, t('empty')))
       : createElement('ul', { className: 'level' }, nestRows(rows).map(node => rowElement(node, view)))),
+    // The width is the panel's own even when undocked, but a seam is only
+    // meaningful where there is something to drag it against.
+    view.docked && resizerElement(resizer, view),
   ])
 }

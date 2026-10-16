@@ -57,11 +57,13 @@
  * @module @leiwang2000/dsh-tweaks/client/features/file-panel
  */
 
+import type { SidebarRightGuideEntry } from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
 import type { TranslateNS } from '@deepseek-ai/dsh-client-ui-slots'
 import type { ClientContext } from '../../contracts.ts'
 import type { DockingDocument } from './docking.ts'
 import type { HostDom } from './panel-host.ts'
 import type { PanelMount } from './panel-mount.ts'
+import { GuideArtworkFiles } from '@deepseek-ai/dsh-client-ui-primitives'
 import { fileAddressFor } from '@deepseek-ai/dsh-util-workspace-path'
 import { isDockedTab } from '../../dom/dock-anchors.ts'
 import { createBrowserHostDom, deferToNextTask, hasDocument, installPanelStyles } from './browser-dom.ts'
@@ -75,7 +77,19 @@ import { createPanelRenderer } from './renderer.ts'
 import { revealRow } from './reveal.ts'
 import { panelStyles } from './styles.ts'
 import { FILES_ID, FILES_KIND } from './surface.ts'
+import { FilesPanelTitle } from './title.ts'
 import { installPanelToggle } from './toolbar.ts'
+
+/**
+ * The shortcut command the guide entry names, so the capsule shows its keys.
+ *
+ * The command itself is registered by the built-in files plugin, which keeps
+ * running after this plugin takes its tab kind over (see the comment in
+ * {@link install}). Reading the id off the guide entry's own type is how the
+ * guide does it, and it keeps this plugin from importing the shortcut package
+ * just to spell a string it does not own.
+ */
+const WORKSPACE_FILES_COMMAND = 'workspace.files' as NonNullable<SidebarRightGuideEntry['commandId']>
 
 /**
  * Install the file-panel tweak.
@@ -92,8 +106,8 @@ export function install(ctx: ClientContext): void {
 
   // Stage one: the type. An `extension` outranks the built-in `builtin` band for
   // the same kind, which is the documented way a type from outside the product
-  // takes a built-in kind over. The guide entry restores the "Start" page's door
-  // to the files tab, which disappears with the built-in entry.
+  // takes a built-in kind over. The guide entry is the built-in one, glyph and
+  // command id included (ADR-0003).
   ctx.effect(() => ctx.sidebarRightTabs.register({
     id: FILES_ID,
     kind: FILES_KIND,
@@ -101,9 +115,11 @@ export function install(ctx: ClientContext): void {
     title: () => t()('type.label'),
     guide: [{
       id: 'workspace',
+      commandId: WORKSPACE_FILES_COMMAND,
       order: 10,
       title: () => t()('guide.title'),
       description: () => t()('guide.description'),
+      icon: GuideArtworkFiles,
     }],
   }), 'dsh-tweaks: file-panel tab type')
 
@@ -115,6 +131,19 @@ export function install(ctx: ClientContext): void {
     { name: 'sidebar.right.pane.tab', key: FILES_ID },
     () => null,
   )), 'dsh-tweaks: file-panel body seat')
+
+  // Stage three: the chip's title. The built-in type registers one and the chip
+  // falls back to bare registry text without it, so taking the kind over takes
+  // this over too.
+  ctx.effect(() => ctx.slots.inject('sidebar.right.pane.tab.title', () => ctx.slots.register(
+    { name: 'sidebar.right.pane.tab.title', key: FILES_ID },
+    FilesPanelTitle,
+  )), 'dsh-tweaks: file-panel tab title')
+
+  // What is deliberately *not* here: a `workspace.files` shortcut. The built-in
+  // files plugin keeps running after the takeover and still registers that
+  // command; the registry refuses a duplicate id, so re-registering would throw
+  // during install (see ADR-0003).
 
   // Everything past here patches the page: a stylesheet, a container docked into a
   // tab body, and an observer for tab switches. With no document there is nothing
@@ -168,19 +197,27 @@ function createDockedPanel(
   const t = (): TranslateNS<typeof NS> => ctx.locale.bind(NS)
   const controller = createPanelController(createDirectoryIo(ctx.remote))
 
+  // The renderer is built before the mount, and one of its callbacks has to
+  // reach the mount: the scroller exists only after React commits, which is when
+  // a reveal becomes possible. The holder keeps that one-directional, so the
+  // renderer learns nothing about the mount.
+  let mount: PanelMount<Element> | undefined
+
   const renderer = createPanelRenderer({
     t,
     onToggle: (path) => { controller.toggle(path) },
     onOpen: (path) => { openRow(ctx, controller.state().root, path) },
     onFilter: (filter) => { controller.setFilter(filter) },
+    onReload: () => { controller.reload() },
     onScroll: (scrollTop) => { controller.setScroll(scrollTop) },
     scrollTop: () => controller.state().scrollTop,
-    // `revealRow` finds the scroller from its own marker, so the renderer has
-    // nothing to hand over here.
-    onScroller: () => {},
+    // The scroller arriving *is* the commit signal: it is the element the tree
+    // was drawn into, so it can only run after the rows exist. `revealRow` finds
+    // the scroller from its own marker, so there is nothing to hand over here.
+    onScroller: () => { mount?.onRendered() },
   })
 
-  const mount = createPanelMount<Element>({
+  mount = createPanelMount<Element>({
     dom: options.dom,
     controller,
     render: renderer.render,
@@ -231,10 +268,17 @@ function createDockedPanel(
  * this module: this only assembles the four facts it takes and runs the plan
  * through the sidebar.
  *
- * The two facts that are not obvious:
+ * The facts that are not obvious:
  * - **The acting tab is docked whenever it has a slot to lend.** A docked tab's
  *   address is the tab's own place; a floating one holds one tab and lends
  *   nothing, which `planOpenFile` handles by degrading to a plain open.
+ * - **Only the file-list page may be replaced.** The panel is one instance in two
+ *   homes, and a row clicked in the docked home is a row read *beside* a file the
+ *   reader is looking at: replacing that tab would take the file away in the act
+ *   of opening another. `currentIsFilesPage` is what tells the two homes apart,
+ *   and it is read from the tab's own kind rather than from the panel's mode,
+ *   because the mode is this plugin's rendering choice and the kind is the host's
+ *   record.
  * - **`canClose` is answered permissively on purpose.** The host refuses a close
  *   silently rather than reporting it, and the one tab it refuses is a sole
  *   docked guide, which is never the tab a file row is clicked from. A refusal
@@ -257,6 +301,7 @@ function openRow(ctx: ClientContext, root: string | undefined, path: string): vo
     open: ctx.sidebarRight.tabsIn(sessionId),
     canClose: () => true,
     currentDocked: isDocked(current?.id),
+    currentIsFilesPage: current?.kind === FILES_KIND,
   })
   applyOpenFilePlan({
     openResource: (target, options) => {

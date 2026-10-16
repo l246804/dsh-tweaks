@@ -42,6 +42,8 @@
 
 import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
+import type { PanelMode } from './panel-host.ts'
+import { decideSurface, modeOf } from './surface.ts'
 import { findTabBody } from './tab-anchor.ts'
 
 /** One open tab, as the sidebar's inventory reports it. */
@@ -198,22 +200,34 @@ export function createDocking(options: DockingOptions): Docking {
 
   /** Apply one resolve, remembering what the shell last reported. */
   let lastKey: string | undefined
+  /** The element the last resolve handed over, so a *replaced* one is re-reported. */
+  let lastElement: Element | undefined
   const resolve = (): void => {
     pending = false
     if (disposed)
       return
     const target = resolveDockTarget(facts, inventory.getSnapshot())
+    // Which element the panel docks into depends on how it sits there. A file tab
+    // docks into the preview's own root; the file-list page uses the sidebar's
+    // body seat. The mode comes from `surface.ts`, the same place `panel-mount.ts`
+    // gets it, rather than from a second reading of the kind here.
+    const mode: PanelMode = target === undefined
+      ? 'page'
+      : modeOf(decideSurface(target)) ?? 'page'
     // The element is looked up fresh every time: the shell replaces a tab's body
     // element on re-render, and a cached one would be detached within a frame.
-    const element = target === undefined ? undefined : findTabBody(document, target.tabId)
+    const element = target === undefined ? undefined : findTabBody(document, target.tabId, mode)
     const key = target === undefined
       ? 'none'
-      : `${target.sessionId}\u0000${target.tabId}\u0000${target.address}\u0000${target.workspaceRoot ?? ''}\u0000${element === undefined ? 'absent' : 'present'}`
+      : `${target.sessionId}\u0000${target.tabId}\u0000${target.address}\u0000${target.workspaceRoot ?? ''}\u0000${mode}`
     // A repeat of the same target is what a spurious click or a store commit
-    // produces; skipping it is what keeps a reveal from being re-run.
-    if (key === lastKey)
+    // produces, and skipping it keeps a reveal from being re-run. The element is
+    // compared by identity too: a preview root can replace the seat the panel
+    // fell back to while the preview was mounting.
+    if (key === lastKey && element === lastElement)
       return
     lastKey = key
+    lastElement = element
     place(target, element)
   }
 

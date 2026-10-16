@@ -14,6 +14,11 @@
  * land flush against the corresponding edge instead of at an offset a browser
  * would resolve inconsistently.
  *
+ * The one thing this module does say about timing is the difference between its
+ * two negative answers, because that is what its caller's retry rule is built
+ * on: a row that is not on screen is a "try again later" (`absent`), while a row
+ * the scroller already holds is finished business (`settled`).
+ *
  * @module @leiwang2000/dsh-tweaks/client/features/file-panel/reveal
  */
 
@@ -66,29 +71,48 @@ function measureRow(scroller: HTMLElement, row: HTMLElement): ScrollMetrics {
 }
 
 /**
+ * What one reveal attempt found and did.
+ *
+ * The three answers are the mount's retry rule, stated where the attempt is
+ * made. `absent` is the important one: it means the row is not on screen *yet*
+ * (the renderer has not committed it, an ancestor is collapsed, the filter hides
+ * it), which is a "try again on the next commit", never a "give up". Collapsing
+ * that into a boolean would make "the row is not there" indistinguishable from
+ * "the row is there and already centred", which is how a reveal can be written
+ * off as done while the reader is still looking at the wrong part of the tree.
+ */
+export type RevealOutcome
+  /** The row was found and the scroller was moved to centre it. */
+  = | 'centred'
+  /** The row was found and the scroller already held the centred offset: no write, no scroll event. */
+    | 'settled'
+  /** The row, or the scroller that would hold it, is not on screen. */
+    | 'absent'
+
+/**
  * Bring one file's row to the middle of the panel's scroller.
  *
- * A missing scroller or a row that is not on screen (its parent directory is
- * collapsed, or the filter hides it) is left alone: the caller re-decides on the
- * next state change, so a no-op here is a "not yet", not a failure. Assigning an
- * offset the scroller already has is also skipped, because doing so fires a
- * scroll event a renderer or a listener may be watching.
+ * A missing scroller or a row that is not on screen answers `absent` and leaves
+ * everything alone: the caller re-decides on the next commit, so this is a "not
+ * yet", not a failure. Assigning an offset the scroller already has answers
+ * `settled` and writes nothing, because a redundant assignment fires a scroll
+ * event a renderer or a listener may be watching.
  * @param container - the panel's container element.
  * @param path - the absolute path of the row to centre.
- * @returns whether the scroller moved.
+ * @returns what the attempt found and did.
  */
-export function revealRow(container: Element, path: string): boolean {
+export function revealRow(container: Element, path: string): RevealOutcome {
   const scroller = container.querySelector<HTMLElement>(`[${PANEL_SCROLL_ATTRIBUTE}]`)
   if (scroller === null)
-    return false
+    return 'absent'
   const row = findRow(scroller, path)
   if (row === null)
-    return false
+    return 'absent'
   const next = centredOffset(measureRow(scroller, row))
   if (next === scroller.scrollTop)
-    return false
+    return 'settled'
   scroller.scrollTop = next
-  return true
+  return 'centred'
 }
 
 /** The row element for one path, searched by the marker each row carries. */

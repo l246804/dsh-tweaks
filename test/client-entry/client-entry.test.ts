@@ -58,13 +58,18 @@ vi.mock('react-dom/client', () => ({
 // the server renderer rather than by a DOM.
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
   FileTypeIcon: () => null,
+  GuideArtworkFiles: () => null,
   IconCheckOutlineRegular: () => null,
   IconCopyOutlineRegular: () => null,
   IconFolderCloseRegular: () => null,
   IconFolderOpenRegular: () => null,
+  IconRefreshOutlineRegular: () => null,
+  IconSearchOutlineRegular: () => null,
   IconWarningOutlineRegular: () => null,
   IconWorkspaceTreeOutlineRegular: () => null,
+  Input: () => null,
   MenuItemButton: () => null,
+  PathLabel: () => null,
   Tooltip: () => null,
   classifyFileType: () => 'file',
   writeClipboard: () => Promise.resolve(true),
@@ -183,6 +188,38 @@ describe('client entry over real cordis', () => {
       // existence check.
       const container = loaded.document.querySelector('[data-dsh-tweaks-file-panel]')
       expect(container?.parentNode?.getAttribute('data-sidebar-right-tab')).toBe(FILES_TAB_ID)
+    }
+    finally {
+      await loaded.unload()
+    }
+  })
+
+  it('takes the built-in files kind over in the extension band', async () => {
+    const loaded = await scene()
+    try {
+      // The band is what makes the takeover happen at all. In `builtin` the
+      // registry refuses a second registration for the same kind, and the panel
+      // would never be the one in force.
+      expect(loaded.tabTypes).toEqual([expect.objectContaining({
+        id: '@leiwang2000/dsh-tweaks/file-panel',
+        kind: 'files',
+        priority: 'extension',
+      })])
+    }
+    finally {
+      await loaded.unload()
+    }
+  })
+
+  it('registers a title for the kind it took over, and the guide entry that went with it', async () => {
+    const loaded = await scene()
+    try {
+      // Taking the kind over takes the built-in type's other contributions out
+      // of force with it, and neither is optional (ADR-0003): without the title
+      // seat the chip falls back to bare registry text, and without
+      // `icon`/`commandId` the guide's door loses its glyph and key hint.
+      expect(loaded.registrations.map(row => row.name)).toContain('sidebar.right.pane.tab.title')
+      expect(loaded.tabTypes[0]).toMatchObject({ commandId: 'workspace.files', hasIcon: true })
     }
     finally {
       await loaded.unload()

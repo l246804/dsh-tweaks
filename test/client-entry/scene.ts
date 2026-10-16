@@ -168,13 +168,31 @@ class LocaleService extends Service {
   }
 }
 
-/** The tab-type registry, reduced to `register`. */
+/**
+ * The tab-type registry, reduced to `register`.
+ *
+ * The definitions are recorded rather than discarded because this scene is the
+ * only place the entry is loaded the way the shell loads it, which makes it the
+ * only place "the takeover put back what it took over" can be asserted against a
+ * real registration rather than against a hand-written call log.
+ */
 class SidebarRightTabsService extends Service {
+  /** Every definition the entry registered, in order. */
+  readonly registrations: { readonly id: string, readonly kind: string, readonly priority?: string, readonly commandId?: string, readonly hasIcon?: boolean }[] = []
+
   constructor(ctx: Context) {
     super(ctx, 'sidebarRightTabs')
   }
 
-  register(): () => void {
+  register(definition: { readonly id: string, readonly kind: string, readonly priority?: string, readonly guide?: readonly { readonly commandId?: string, readonly icon?: unknown }[] }): () => void {
+    const entry = definition.guide?.[0]
+    this.registrations.push({
+      id: definition.id,
+      kind: definition.kind,
+      priority: definition.priority,
+      commandId: entry?.commandId,
+      hasIcon: entry?.icon !== undefined,
+    })
     return () => {}
   }
 }
@@ -298,6 +316,8 @@ export interface ClientEntryScene {
   readonly injectedSeats: readonly string[]
   /** Every slot registration the entry's features made. */
   readonly registrations: readonly { readonly name: string, readonly key?: string, readonly id?: string }[]
+  /** Every tab type the entry registered, as the registry recorded it. */
+  readonly tabTypes: readonly { readonly id: string, readonly kind: string, readonly priority?: string, readonly commandId?: string, readonly hasIcon?: boolean }[]
   /** Every listing that reached `remote.workspaceFiles`. */
   readonly listed: readonly ListCall[]
   /** The rendered markup of the panel as it last stood. */
@@ -379,7 +399,7 @@ export async function clientEntryScene(
   const ctx = new Context()
   mount(ctx, LocaleService)
   const slots = mount(ctx, SlotsService)
-  mount(ctx, SidebarRightTabsService)
+  const tabTypes = mount(ctx, SidebarRightTabsService)
   mount(ctx, SidebarRightService)
   mount(ctx, SessionsService)
   mount(ctx, RemoteService)
@@ -407,6 +427,7 @@ export async function clientEntryScene(
     fiber: { get state() { return fiber.state } },
     injectedSeats: slots.injected,
     registrations: slots.registrations,
+    tabTypes: tabTypes.registrations,
     listed: namespace?.calls ?? [],
     lastMarkup: () => renderToStaticMarkup(log.elements[log.elements.length - 1]!),
     allMarkup: () => log.elements.map(element => renderToStaticMarkup(element)).join('\n---\n'),

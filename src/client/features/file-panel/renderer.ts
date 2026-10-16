@@ -14,6 +14,13 @@
  * rather than a component: the mount layer moves the container, and this layer
  * only ever redraws the tree that lives inside it.
  *
+ * One consequence of `createRoot` is worth stating where the wiring is: what
+ * `render` performs is a *request*, not a commit. The rows the view describes are
+ * in the DOM only when React has committed, so anything that has to measure them
+ * (centring the active row) is driven by the view's own ref callback rather than
+ * by the return of `render`. {@link RendererOptions.onScroller} is that channel;
+ * `panel-mount.ts` says what the mount does with it.
+ *
  * `react-dom/client` is a row of the shell's platform module table, so this is a
  * `require` the shell answers with its own single instance rather than a second
  * copy of React; see `react-dom.d.ts` for why the local types are declared.
@@ -38,6 +45,8 @@ export interface RendererOptions {
   readonly onOpen: (path: string) => void
   /** Change the filter. */
   readonly onFilter: (filter: string) => void
+  /** Reload the current root directory. */
+  readonly onReload: () => void
   /** Record the scroller's offset. */
   readonly onScroll: (scrollTop: number) => void
   /**
@@ -47,6 +56,10 @@ export interface RendererOptions {
   readonly scrollTop: () => number
   /**
    * The panel's scroller element, as the last render mounted it.
+   *
+   * Called from the view's ref, i.e. during React's commit, which makes it the
+   * panel's "the last draw is on screen" signal. The mount uses it to run a
+   * reveal the row would have been missing from at decision time.
    * @param element - the scroller.
    */
   readonly onScroller: (element: HTMLElement) => void
@@ -79,10 +92,12 @@ export function createPanelRenderer(options: RendererOptions): {
       }
       root.render(createElement(PanelBody, {
         state: view.state,
+        docked: view.docked,
         t: options.t(),
         onToggle: options.onToggle,
         onOpen: options.onOpen,
         onFilter: options.onFilter,
+        onReload: options.onReload,
         onScroll: options.onScroll,
         restoreScrollTop: options.scrollTop(),
         onScrollerReady: options.onScroller,

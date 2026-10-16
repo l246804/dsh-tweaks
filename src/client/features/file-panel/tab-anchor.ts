@@ -10,16 +10,30 @@
  * - `[data-dockkit-content="<tabId>"]`: the per-tab `<section>` the docking kit
  *   renders for **every** tab record, selected or not, docked or floating. It is
  *   the one anchor that survives hiding, dragging and re-selection, which is what
- *   makes "move the container into it" a stable operation.
+ *   makes "move the container into it" a stable operation, and it is what pins
+ *   every lookup below to *one tab* rather than to one kind of seat.
  * - `[data-sidebar-right-tab="<tabId>"]`: the wrapper the right sidebar puts
  *   around a tab body. It sits inside the section above and is where the panel's
  *   sibling content actually lives, so it is the element the panel's flex row
  *   belongs on.
+ * - `[data-textpreview-state]`: the preview plugin's own root, one of
+ *   `text` / `unsupported` / `loading`. It is the element a file tab's body is
+ *   about, so it is where a docked panel goes: the preview's own toolbar is a
+ *   row of that element's children, and the panel belongs beside the content
+ *   under that row, not beside the wrapper that holds both.
  *
- * Both are `data-*` attributes the kit and the sidebar write themselves, and both
+ * All three are `data-*` attributes the host writes itself, and the first two
  * carry the **tab id**, not an occurrence id and not a DOM position, so a
  * re-render that replaces the body element is still found. Class names are never
  * used: they carry a build hash.
+ *
+ * ## Why the lookup is scoped to the tab's own section
+ *
+ * The kit keeps a visited tab's body mounted, so several tabs can hold several
+ * preview roots at once and all but one of them are off screen. A document-wide
+ * query for the preview root would therefore dock the panel into whichever tab
+ * happened to render first. Every lookup here starts from the section the tab id
+ * names, which is what makes "this tab's preview" the question actually asked.
  *
  * ## Why the sidebar anchor alone is not enough
  *
@@ -59,17 +73,40 @@
 /**
  * The anchor names, the selector text and the title-chrome list all come from
  * `dom/dock-anchors.ts`, which is the single description of the kit's markup;
- * the tab actions read the same attributes. What stays in this module is the one
- * judgement only the panel needs: which of a tab's two seats is its body.
+ * the tab actions read the same attributes. What stays in this module is the two
+ * judgements only the panel needs: which of a tab's two seats is its body, and
+ * that a docked panel hangs off the preview root rather than off that seat.
+ *
+ * The preview root's attribute is named here rather than in `dock-anchors.ts`
+ * because that module describes the *docking kit*, the anchors every patch in
+ * this plugin reads, while `[data-textpreview-state]` belongs to the preview
+ * plugin and no other feature reads it. If a second reader ever appears, it is
+ * that module's row to gain.
  */
 import type { HostAnchoredElement } from '../../dom/dock-anchors.ts'
+import type { PanelMode } from './panel-host.ts'
 import {
   dockContentSelector,
   sidebarTabSelector,
   TITLE_CONTAINER_SELECTORS,
 } from '../../dom/dock-anchors.ts'
+import { attributeSelector } from '../../dom/selector.ts'
 
 export { dockContentSelector, sidebarTabSelector }
+
+/**
+ * The preview plugin's root, written by the preview itself.
+ *
+ * It is the element a file tab's content is *about*: the preview's toolbar is
+ * one of its children and its body another, so a panel docked into the root sits
+ * beside the content while the toolbar keeps its own row. The attribute is
+ * present in all three of the preview's states (`text`, `unsupported`,
+ * `loading`), so a dock does not depend on a file being readable.
+ */
+const PREVIEW_ROOT_ATTRIBUTE = 'data-textpreview-state'
+
+/** The selector naming a preview root, without regard to which state it is in. */
+const PREVIEW_ROOT_SELECTOR = attributeSelector(PREVIEW_ROOT_ATTRIBUTE)
 
 /**
  * The narrow query surface this module needs: a root whose `querySelector`
@@ -96,20 +133,37 @@ export interface AnchorScope {
  *
  * The kit's per-tab `<section>` is the spine: it exists for every rendered tab
  * record, docked or floating, selected or not, and it is the only anchor that
- * names *one tab* rather than one kind of seat. Inside it, the sidebar gives the
- * tab id to both the chip's title seat and the body seat, so this picks the seat
- * that is not a title (see the module note) and ignores the rest. The section
- * itself is the fallback, which is also what a tab whose body is not mounted yet
- * gets: docking at the pane level is wrong-looking for a frame but never puts the
- * panel inside a label.
+ * names *one tab* rather than one kind of seat. It is also what scopes the rest:
+ * the kit keeps a visited tab's body mounted, so several tabs can hold preview
+ * roots at once and a document-wide search would pick the wrong tab's.
+ *
+ * Inside that section the answer depends on the mode, because the two homes are
+ * different elements:
+ *
+ * - **dock**: the preview root, so the panel lands beside the file's content and
+ *   under the preview's own toolbar row. A tab whose body is not a preview (a
+ *   non-text resource, a preview that has not rendered yet) falls back to the
+ *   sidebar seat; the sidebar gives the tab id to *both* the chip's title seat
+ *   and the body seat, so {@link bodySeatIn} picks the one that is not a title.
+ * - **page**: the sidebar seat alone, which is where the file-list body this
+ *   plugin itself renders lives.
+ *
+ * The section is the last fallback for either mode: docking at the pane level is
+ * wrong-looking for a frame, but never puts the panel inside a label.
  * @param scope - the document to search.
  * @param tabId - the tab record's id.
+ * @param mode - how the panel will sit there, which decides the host element.
  * @returns the element to dock into, or undefined when the tab is not rendered.
  */
-export function findTabBody(scope: AnchorScope, tabId: string): Element | undefined {
+export function findTabBody(scope: AnchorScope, tabId: string, mode: PanelMode): Element | undefined {
   const section = scope.querySelector(dockContentSelector(tabId)) as Element | null | undefined
   if (section === null || section === undefined)
     return undefined
+  if (mode === 'dock') {
+    const preview = section.querySelector(PREVIEW_ROOT_SELECTOR) as Element | null
+    if (preview !== null)
+      return preview
+  }
   return bodySeatIn(section, tabId) ?? section
 }
 
