@@ -27,13 +27,25 @@ export type { ClientContext } from './contracts.ts'
  * face and tab-type registry, the session list, the Remote namespaces, and the
  * locale registry.
  *
+ * `remote.workspaceFiles` is a service in its own right rather than a member of
+ * `remote`: the gateway registers every Remote namespace as `remote.<name>`, so
+ * reading one passes through this fiber's `inject` gate like any other service.
+ * Declaring only `remote` therefore fails nothing up front. Before that
+ * namespace has ever been registered the read answers `undefined`, and from the
+ * first registration onwards it throws `cannot get property
+ * "remote.workspaceFiles" without inject`, which the panel hits the first time a
+ * reader opens the files tab. The declaration outlives the service, so an unload
+ * or a rolled-back mount does not bring `undefined` back; it stays a throw.
+ * `remote.$stream` and `remote.$host` do belong to `remote` itself and need no
+ * entry of their own.
+ *
  * Only services a feature actually calls belong here: naming one is a claim that
  * the plugin cannot work without it, so a service that merely happens to be
  * mounted would hold activation back for nothing. The conversation surface is
  * deliberately absent: the composer patch that needs its neighborhood reads the
  * DOM instead, because the channel it would call does not exist.
  */
-export const inject = ['slots', 'sidebarRight', 'sidebarRightTabs', 'sessions', 'remote', 'locale']
+export const inject = ['slots', 'sidebarRight', 'sidebarRightTabs', 'sessions', 'remote', 'remote.workspaceFiles', 'locale']
 
 /** Every installed tweak, in installation order. */
 const FEATURES: readonly ((ctx: ClientContext) => void)[] = [
