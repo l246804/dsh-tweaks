@@ -17,7 +17,6 @@
 import type { ClientContext } from './contracts.ts'
 import { install as installFilePanel } from './features/file-panel/index.ts'
 import { install as installMessageCopy } from './features/message-copy/index.ts'
-import { install as installReferenceHighlight } from './features/reference-highlight/index.ts'
 import { install as installTabActions } from './features/tab-actions/index.ts'
 
 export type { ClientContext } from './contracts.ts'
@@ -42,14 +41,12 @@ export type { ClientContext } from './contracts.ts'
  * Only services a feature actually calls belong here: naming one is a claim that
  * the plugin cannot work without it, so a service that merely happens to be
  * mounted would hold activation back for nothing. The conversation surface is
- * deliberately absent: the composer patch that needs its neighborhood reads the
- * DOM instead, because the channel it would call does not exist.
+ * deliberately absent: no installed feature calls it.
  */
 export const inject = ['slots', 'sidebarRight', 'sidebarRightTabs', 'sessions', 'remote', 'remote.workspaceFiles', 'locale']
 
 /** Every installed tweak, in installation order. */
 const FEATURES: readonly ((ctx: ClientContext) => void)[] = [
-  installReferenceHighlight,
   installFilePanel,
   installTabActions,
   installMessageCopy,

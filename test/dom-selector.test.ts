@@ -13,7 +13,7 @@ import { attributeSelector, compoundSelector, escapeAttributeValue } from '../sr
 
 describe('selector construction', () => {
   it('builds a presence selector from an attribute name', () => {
-    expect(attributeSelector('data-composer-text-ref')).toBe('[data-composer-text-ref]')
+    expect(attributeSelector('data-dockkit-host')).toBe('[data-dockkit-host]')
   })
 
   it('builds an exact-value selector, quoting the value', () => {

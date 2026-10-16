@@ -153,26 +153,26 @@ describe('the DOM stand-in itself', () => {
   it('keeps the dataset and attribute views in step', () => {
     const { document } = createFakeDom()
     const element = document.createElement('span')
-    element.setAttribute('data-dsh-tweaks-plain-text-ref', '')
-    expect(element.dataset.dshTweaksPlainTextRef).toBe('')
-    element.removeAttribute('data-dsh-tweaks-plain-text-ref')
-    expect(element.dataset.dshTweaksPlainTextRef).toBeUndefined()
+    element.setAttribute('data-dsh-tweaks-style', '')
+    expect(element.dataset.dshTweaksStyle).toBe('')
+    element.removeAttribute('data-dsh-tweaks-style')
+    expect(element.dataset.dshTweaksStyle).toBeUndefined()
   })
 
   it('supports the selector forms the plugin builds', () => {
     const { document } = createFakeDom()
     const openable = document.createElement('span')
-    openable.setAttribute('data-composer-text-ref', '')
-    openable.setAttribute('class', 'q44v1G_reference q44v1G_textRef q44v1G_openable')
+    openable.setAttribute('data-dockkit-host', 'dock')
+    openable.setAttribute('class', 'q44v1G_openable q44v1G_other')
     const handTyped = document.createElement('span')
-    handTyped.setAttribute('data-composer-text-ref', '')
-    handTyped.setAttribute('class', 'q44v1G_reference q44v1G_textRef')
+    handTyped.setAttribute('data-dockkit-host', 'dock')
+    handTyped.setAttribute('class', 'q44v1G_other')
     document.body.appendChild(openable)
     document.body.appendChild(handTyped)
 
-    expect(document.querySelectorAll('[data-composer-text-ref]')).toHaveLength(2)
-    expect(document.querySelectorAll('[data-composer-text-ref]:not([class*="_openable"])')).toHaveLength(1)
-    expect(document.querySelector('[data-composer-text-ref]:not([class*="_openable"])')).toBe(handTyped)
+    expect(document.querySelectorAll('[data-dockkit-host]')).toHaveLength(2)
+    expect(document.querySelectorAll('[data-dockkit-host]:not([class*="_openable"])')).toHaveLength(1)
+    expect(document.querySelector('[data-dockkit-host]:not([class*="_openable"])')).toBe(handTyped)
   })
 
   it('refuses a selector form it does not implement instead of matching nothing', () => {
