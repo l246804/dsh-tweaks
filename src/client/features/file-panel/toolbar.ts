@@ -87,8 +87,11 @@ function ToggleButton(options: ToggleOptions): ReactNode {
   const t = options.t()
   return createElement('button', {
     'type': 'button',
+    'className': 'tool',
     // The host's own toolbar classes carry a build hash and are not knowable
-    // here; the attribute is what a reader can find and a test can assert.
+    // here; the attribute is what a reader can find and a test can assert. The
+    // plugin's stylesheet keys the built-in `.tool` values off the same marker,
+    // so the button matches the toolbar it sits in.
     'data-dsh-tweaks-files-panel-toggle': '',
     'aria-pressed': enabled,
     'aria-label': t('panel.aria'),

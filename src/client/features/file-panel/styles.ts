@@ -445,9 +445,12 @@ ${panelScrollerSelector()}::-webkit-scrollbar-track {
 
 /* The current file. The built-in tree has no active state because it never
    needed one; the panel marks the row the active tab shows, and this is the
-   only addition to the row's appearance. */
+   only addition to the row's appearance. The hover fill is the active fill on
+   purpose: the reader's eye reads "this is the row I am on" the same way it
+   reads "this is the row I am about to pick", and the two fills differing would
+   make one of the two states look wrong. */
 [${PANEL_CONTAINER_ATTRIBUTE}] button.row[aria-current='true'] {
-  background: var(--dsw-alias-interactive-bg-active);
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 
 [${PANEL_CONTAINER_ATTRIBUTE}] .icon {
@@ -471,6 +474,48 @@ ${panelScrollerSelector()}::-webkit-scrollbar-track {
    it through a CSS-module class, whose runtime form carries a build hash. */
 .titleIcon {
   flex: none;
+}
+
+/* The panel's toggle on a file tab's document toolbar. The values are the
+   built-in tree's \`.tool\`, term for term, because the button sits between that
+   package's own toolbar buttons and must not read as the odd one out; a bare
+   \`<button>\` otherwise takes the browser's border, which is the one difference
+   an eye catches immediately. The pressed state is the hover fill, which is
+   also what the built-in tree's own pressed tool uses.
+
+   Deliberately not scoped to the panel container, for the same reason as
+   \`.titleIcon\` above: the toolbar is the preview's, not the panel's. The
+   attribute is the plugin's own marker (\`toolbar.ts\`), which is what keeps an
+   unscoped attribute rule safe. */
+[data-dsh-tweaks-files-panel-toggle] {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  color: var(--dsw-alias-label-secondary);
+  line-height: 1;
+  background: transparent;
+  border: none;
+  border-radius: var(--dsw-radius-sm);
+  cursor: pointer;
+}
+
+[data-dsh-tweaks-files-panel-toggle] svg {
+  width: 15px;
+  height: 15px;
+}
+
+[data-dsh-tweaks-files-panel-toggle]:hover {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+[data-dsh-tweaks-files-panel-toggle][aria-pressed='true'] {
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 
 [${PANEL_CONTAINER_ATTRIBUTE}] .name {
