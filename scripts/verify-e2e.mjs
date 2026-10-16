@@ -7,6 +7,15 @@
  * This is the only layer that can show the plugin actually works. The other
  * checks prove the artifact is well-formed; this one proves DSH accepts it.
  *
+ * Only this plugin's own activation is a verdict on this plugin. The booted
+ * profile carries the whole product, and an unrelated entry that fails to
+ * activate (a shipped plugin missing an optional dependency, say) says nothing
+ * about what is being verified here. So the startup audit is read per entry and
+ * attributed by package name: this package failing is a hard failure, another
+ * package failing is reported as a note and does not change the exit code. A
+ * required entry failing is still fatal whatever its name, because the server
+ * does not come up at all in that case.
+ *
  * The run is hermetic by construction:
  * - `DSH_HOME` points inside the repository (`.verify-home`, git-ignored and
  *   excluded from every local tool), so the user's own `~/.dsh` is never touched.
@@ -32,15 +41,10 @@ const PROFILE = 'verify'
 /** How long to let the server boot before reading its startup report. */
 const BOOT_TIMEOUT_MS = 90_000
 
-/** Console prefixes that mean a plugin failed to activate, from the startup audit. */
-const ACTIVATION_FAILURES = [
-  /did not activate/u,
-  /startup failed/u,
-  /Plugins waiting for services/u,
-]
-
 const failures = []
 const passes = []
+/** Printed but not counted as failures: other packages' problems. */
+const notes = []
 
 /**
  * Record one assertion.
@@ -83,6 +87,44 @@ async function run(command, args, options = {}) {
   })
 }
 
+/** The startup audit's summary lines, which mean the audit has finished. */
+const AUDIT_DONE = [
+  /: warning: \d+ entr(?:y|ie) did not activate/u,
+  /: startup failed: /u,
+  /Plugins waiting for services/u,
+]
+
+/**
+ * The audited entries belonging to one package.
+ *
+ * Upstream names each entry as `<id> (<package name>): …`. Only the package name
+ * identifies who failed, because the id is chosen by whoever wrote the row.
+ *
+ * This exists so the verdict can be about this package alone: the booted profile
+ * carries the whole product, and another package's missing dependency says
+ * nothing about the artifact under verification. A required entry failing is the
+ * exception, and it is caught separately by whether the server came up at all.
+ * @param log - the boot log.
+ * @param packageName - the package whose entries are wanted.
+ * @returns one line per matching entry.
+ */
+function failedEntriesOf(log, packageName) {
+  const entries = []
+  let collecting = false
+  for (const line of log.split('\n')) {
+    const named = /^(\S+) \(([^)]+)\):/u.exec(line)
+    if (named !== null) {
+      collecting = named[2] === packageName
+      if (collecting)
+        entries.push(line.trim())
+      continue
+    }
+    if (collecting && /^\s+\S/u.test(line))
+      entries[entries.length - 1] += ` ${line.trim()}`
+  }
+  return entries
+}
+
 /**
  * Start the Web profile and wait until it reports its URL or fails to activate.
  * @param logPath - where the child's output is written.
@@ -102,9 +144,9 @@ async function bootWebProfile(logPath) {
   })
   const append = (chunk) => {
     log += chunk
-    // The server prints its URL once the graph is up and audited; an activation
-    // failure prints first when it is a required row.
-    if (/dsh web: http/u.test(log) || ACTIVATION_FAILURES.some(pattern => pattern.test(log)))
+    // The server prints its URL once the graph is up and audited; the audit's
+    // own summary lines print first when something is down.
+    if (/dsh web: http/u.test(log) || AUDIT_DONE.some(pattern => pattern.test(log)))
       settled()
   }
   child.stdout?.on('data', append)
@@ -213,17 +255,22 @@ async function main() {
   const logPath = join(await mkdtemp(join(tmpdir(), 'dsh-tweaks-e2e-')), 'boot.log')
   const server = await bootWebProfile(logPath)
   try {
-    const activationFailure = ACTIVATION_FAILURES.find(pattern => pattern.test(server.log))
-    check(
-      'no activation failure at startup',
-      activationFailure === undefined,
-      activationFailure === undefined ? undefined : `matched ${activationFailure}\n${server.log}`,
-    )
     check(
       'the Web profile reports its URL',
       /dsh web: http/u.test(server.log),
       server.log.slice(-2000),
     )
+
+    // Only this package's own entries decide this check: the profile boots the
+    // whole product, so another package's failure says nothing about this one.
+    const ours = failedEntriesOf(server.log, name)
+    check('every entry of this plugin activated', ours.length === 0, ours.join('\n'))
+
+    // A required entry failing stops the server, so that one is fatal whoever
+    // owns it; the URL check below catches it, and this names what happened.
+    if (/startup failed: /u.test(server.log) && ours.length === 0) {
+      notes.push(`a required entry owned by another package failed: ${/dsh: startup failed: [^\n]*/u.exec(server.log)?.[0]}`)
+    }
 
     const url = /dsh web: (\S+)/u.exec(server.log)?.[1]
     if (url !== undefined) {
@@ -268,6 +315,7 @@ async function main() {
 /** Print the collected result and set the exit code. */
 function report() {
   for (const label of passes) console.log(`  ok   ${label}`)
+  for (const text of notes) console.log(`  note ${text}`)
   for (const failure of failures) console.error(`  FAIL ${failure}`)
   if (failures.length > 0) {
     console.error(`\nend-to-end verification: ${failures.length} failure(s), ${passes.length} check(s) passed`)
