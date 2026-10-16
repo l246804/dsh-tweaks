@@ -148,9 +148,12 @@ function readOrder(host: TabActionsHost<string>): readonly OrderedTab[] {
 /**
  * Contribute one menu item that closes its own target set.
  *
- * The set is recomputed on activation, so a strip that changed while the menu
- * was open still gets the right tabs. The row is disabled, never absent, when
- * the set is empty: the action's existence is the point.
+ * The set is read while the row renders, which is when the menu opens, and that
+ * one set answers both the row's disabled state and the click. A strip that
+ * changed while the menu stayed open is therefore not re-read: reading it again
+ * at click time would let the row act on tabs it never showed as its targets.
+ * The row is disabled, never absent, when the set is empty: the action's
+ * existence is the point.
  * @param host - the host to contribute through.
  * @param action - which of the three sets this item closes.
  * @param id - the list-cell id, unique within the slot.

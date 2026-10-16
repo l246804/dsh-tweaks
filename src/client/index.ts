@@ -24,10 +24,16 @@ export type { ClientContext } from './contracts.ts'
 
 /**
  * Required browser services: the slot registry, the right sidebar's navigation
- * face and tab-type registry, the conversation surface, the session list, the
- * Remote namespaces, and the locale registry.
+ * face and tab-type registry, the session list, the Remote namespaces, and the
+ * locale registry.
+ *
+ * Only services a feature actually calls belong here: naming one is a claim that
+ * the plugin cannot work without it, so a service that merely happens to be
+ * mounted would hold activation back for nothing. The conversation surface is
+ * deliberately absent: the composer patch that needs its neighborhood reads the
+ * DOM instead, because the channel it would call does not exist.
  */
-export const inject = ['slots', 'sidebarRight', 'sidebarRightTabs', 'uiConversation', 'sessions', 'remote', 'locale']
+export const inject = ['slots', 'sidebarRight', 'sidebarRightTabs', 'sessions', 'remote', 'locale']
 
 /** Every installed tweak, in installation order. */
 const FEATURES: readonly ((ctx: ClientContext) => void)[] = [
