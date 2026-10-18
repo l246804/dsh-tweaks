@@ -53,6 +53,7 @@ import {
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { createElement, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { CHAT_ROW_ANCHORS } from '../../dom/host-anchors.ts'
 import { formatMessageClock, msUntilNextLocalMidnight, startOfLocalDay } from './clock.ts'
 import { noticeText } from './notice.ts'
 import { messageContent } from './payload.ts'
@@ -178,7 +179,7 @@ function MessageCopyActions({ time, copy, t }: MessageCopyActionsProps): ReactNo
   }, [copied, copy])
   return createElement(
     'div',
-    { 'className': 'dshTweaksMessageCopy-actions', 'data-clock': 'start' },
+    { className: 'dshTweaksMessageCopy-actions', [CHAT_ROW_ANCHORS.clock.name]: 'start' },
     createElement('span', { className: 'dshTweaksMessageCopy-time' }, formatMessageClock(time, t, day)),
     createElement(
       Tooltip,

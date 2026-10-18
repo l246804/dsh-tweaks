@@ -67,6 +67,7 @@ import {
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { createElement, useMemo } from 'react'
+import { FILES_TREE_ANCHORS } from '../../dom/host-anchors.ts'
 import { PANEL_SCROLL_ATTRIBUTE } from './panel-host.ts'
 import { createPanelResizer, PANEL_RESIZER_ATTRIBUTE } from './resizer.ts'
 import { nestRows, visibleRows } from './tree.ts'
@@ -178,8 +179,8 @@ function rowElement(node: RowNode, view: PanelViewState): ReactNode {
     return createElement('li', {
       key,
       'className': 'item',
-      'data-files-entry': 'directory',
-      'data-files-path': row.path,
+      [FILES_TREE_ANCHORS.entry.name]: 'directory',
+      [FILES_TREE_ANCHORS.path.name]: row.path,
       'data-dsh-tweaks-files-path': row.path,
     }, [
       createElement('button', {
@@ -202,8 +203,8 @@ function rowElement(node: RowNode, view: PanelViewState): ReactNode {
     return createElement('li', {
       key,
       'className': 'item',
-      'data-files-entry': 'file',
-      'data-files-path': row.path,
+      [FILES_TREE_ANCHORS.entry.name]: 'file',
+      [FILES_TREE_ANCHORS.path.name]: row.path,
       'data-dsh-tweaks-files-path': row.path,
     }, createElement('button', {
       'type': 'button',
@@ -221,8 +222,8 @@ function rowElement(node: RowNode, view: PanelViewState): ReactNode {
   return createElement('li', {
     key,
     'className': 'item',
-    'data-files-entry': 'other',
-    'data-files-path': row.path,
+    [FILES_TREE_ANCHORS.entry.name]: 'other',
+    [FILES_TREE_ANCHORS.path.name]: row.path,
     'data-dsh-tweaks-files-path': row.path,
   }, createElement('span', {
     'className': 'row other',
@@ -256,7 +257,7 @@ function headerElement(view: PanelViewState): ReactNode {
       key: 'path',
       path: state.root ?? '',
       className: 'path',
-    }, { 'data-files-path': '' })),
+    }, { [FILES_TREE_ANCHORS.path.name]: '' })),
     createElement(Tooltip, {
       key: 'reload',
       label: t('reload'),

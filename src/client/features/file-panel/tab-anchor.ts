@@ -71,17 +71,13 @@
  */
 
 /**
- * The anchor names, the selector text and the title-chrome list all come from
- * `dom/dock-anchors.ts`, which is the single description of the kit's markup;
- * the tab actions read the same attributes. What stays in this module is the two
- * judgements only the panel needs: which of a tab's two seats is its body, and
- * that a docked panel hangs off the preview root rather than off that seat.
- *
- * The preview root's attribute is named here rather than in `dock-anchors.ts`
- * because that module describes the *docking kit*, the anchors every patch in
- * this plugin reads, while `[data-textpreview-state]` belongs to the preview
- * plugin and no other feature reads it. If a second reader ever appears, it is
- * that module's row to gain.
+ * The anchor names and the selector text come from the `dom/` layer:
+ * `host-anchors.ts` holds every host attribute spelling the plugin depends on,
+ * and `dock-anchors.ts` builds the kit's selectors and the title-chrome list on
+ * top of it; the tab actions read the same attributes. What stays in this module
+ * is the two judgements only the panel needs: which of a tab's two seats is its
+ * body, and that a docked panel hangs off the preview root rather than off that
+ * seat.
  */
 import type { HostAnchoredElement } from '../../dom/dock-anchors.ts'
 import type { PanelMode } from './panel-host.ts'
@@ -90,6 +86,7 @@ import {
   sidebarTabSelector,
   TITLE_CONTAINER_SELECTORS,
 } from '../../dom/dock-anchors.ts'
+import { TEXT_PREVIEW_ANCHORS } from '../../dom/host-anchors.ts'
 import { attributeSelector } from '../../dom/selector.ts'
 
 export { dockContentSelector, sidebarTabSelector }
@@ -103,7 +100,7 @@ export { dockContentSelector, sidebarTabSelector }
  * present in all three of the preview's states (`text`, `unsupported`,
  * `loading`), so a dock does not depend on a file being readable.
  */
-const PREVIEW_ROOT_ATTRIBUTE = 'data-textpreview-state'
+const PREVIEW_ROOT_ATTRIBUTE = TEXT_PREVIEW_ANCHORS.state.name
 
 /** The selector naming a preview root, without regard to which state it is in. */
 const PREVIEW_ROOT_SELECTOR = attributeSelector(PREVIEW_ROOT_ATTRIBUTE)

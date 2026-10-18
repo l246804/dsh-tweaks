@@ -39,7 +39,7 @@
   "scripts": {
     "build": "tsdown",
     "dev": "tsdown --watch",
-    "knip": "knip",
+    "knip": "knip --no-config-hints",
     "lint": "eslint --cache",
     "prepack": "nr build",
     "release": "bumpp",
@@ -47,8 +47,10 @@
     "test": "pnpm run build && vitest",
     "typecheck": "tsc",
     "check:artifact": "node scripts/check-artifact.mjs",
+    "check:anchors": "node scripts/check-anchors.mjs",
+    "check:glossary": "node scripts/check-glossary.mjs",
     "verify:e2e": "node scripts/verify-e2e.mjs",
-    "ci": "pnpm run lint && pnpm run typecheck && pnpm run knip && pnpm run test --run && pnpm run check:artifact",
+    "ci": "pnpm run lint && pnpm run typecheck && pnpm run knip && pnpm run test --run && pnpm run check:artifact && pnpm run check:anchors && pnpm run check:glossary",
     "prepare": "git config core.hooksPath .githooks && simple-git-hooks && skills experimental_sync -y -a universal"
   },
   "scripts-info": {
@@ -61,6 +63,10 @@
     "start": "Run the entry file",
     "test": "Run the test suite",
     "typecheck": "Check types",
+    "check:artifact": "Check the built artifact against the loading contract",
+    "check:anchors": "Check that every host DOM anchor still exists upstream",
+    "check:glossary": "Check the on-screen copy against the glossary vocabulary",
+    "verify:e2e": "Boot an isolated DSH and verify the plugin activates",
     "ci": "Run the full continuous integration pipeline",
     "prepare": "Set up git hooks and skills"
   },
@@ -138,7 +144,7 @@
     }
   ],
   "simple-git-hooks": {
-    "pre-commit": "pnpm i --frozen-lockfile --ignore-scripts --offline && pnpm run ci && pnpx nano-staged"
+    "pre-commit": "pnpm exec nano-staged && pnpm run ci"
   },
   "nano-staged": {
     "*.{js,ts,tsx,json,css,md,yaml,vue}": "eslint --fix --no-warn-ignored"

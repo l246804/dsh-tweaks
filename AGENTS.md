@@ -20,6 +20,17 @@ It exists as read-only reference material for developing this package.
   (`vitest.config.ts`). Any new scanning tool MUST exclude it too.
 - Never commit a change to the pinned submodule commit unless the task is
   explicitly to bump that reference.
+- Host `data-*` anchors are spelled only in `src/client/dom/host-anchors.ts`;
+  `scripts/check-anchors.mjs` checks each one against this tree.
+
+Where to read it:
+
+- Browser behaviour lives under `packages/client/*` (composer in
+  `ui-conversation/src/client/input`, references in `ui-reference`, chat rows in
+  `ui-chat`); the Host side is the rest of `packages/*`.
+- The running installation ships bundles only, with no source. Read the submodule.
+- The pin can lag the running DSH; `dsh --version` decides which wins when
+  behaviour and source disagree.
 
 ## Agent skills
 

@@ -25,6 +25,8 @@
  * @module @leiwang2000/dsh-tweaks/client/features/message-copy/styles
  */
 
+import { CHAT_ROW_ANCHORS } from '../../dom/host-anchors.ts'
+
 /**
  * The row's stylesheet text.
  *
@@ -106,21 +108,21 @@ export const ROW_STYLES = `
 /* Earlier user rows hide their action line until hover or focus.
    Host: MessageIconActions.module.css, the @media (hover: hover) block. */
 @media (hover: hover) {
-  [data-actions-reveal='hover'] .dshTweaksMessageCopy-actions,
-  :is([data-chat-flow-kind='user'], [data-chat-flow-kind='steering']):has(
-    ~ :is([data-chat-flow-kind='user'], [data-chat-flow-kind='steering'])
+  [${CHAT_ROW_ANCHORS.actionsReveal.name}='hover'] .dshTweaksMessageCopy-actions,
+  :is([${CHAT_ROW_ANCHORS.flowKind.name}='user'], [${CHAT_ROW_ANCHORS.flowKind.name}='steering']):has(
+    ~ :is([${CHAT_ROW_ANCHORS.flowKind.name}='user'], [${CHAT_ROW_ANCHORS.flowKind.name}='steering'])
   ) .dshTweaksMessageCopy-actions {
     opacity: 0;
     transition: opacity 80ms ease;
   }
 
-  [data-actions-reveal='hover']:hover .dshTweaksMessageCopy-actions,
-  [data-actions-reveal='hover']:focus-within .dshTweaksMessageCopy-actions,
-  :is([data-chat-flow-kind='user'], [data-chat-flow-kind='steering']):has(
-    ~ :is([data-chat-flow-kind='user'], [data-chat-flow-kind='steering'])
+  [${CHAT_ROW_ANCHORS.actionsReveal.name}='hover']:hover .dshTweaksMessageCopy-actions,
+  [${CHAT_ROW_ANCHORS.actionsReveal.name}='hover']:focus-within .dshTweaksMessageCopy-actions,
+  :is([${CHAT_ROW_ANCHORS.flowKind.name}='user'], [${CHAT_ROW_ANCHORS.flowKind.name}='steering']):has(
+    ~ :is([${CHAT_ROW_ANCHORS.flowKind.name}='user'], [${CHAT_ROW_ANCHORS.flowKind.name}='steering'])
   ):hover .dshTweaksMessageCopy-actions,
-  :is([data-chat-flow-kind='user'], [data-chat-flow-kind='steering']):has(
-    ~ :is([data-chat-flow-kind='user'], [data-chat-flow-kind='steering'])
+  :is([${CHAT_ROW_ANCHORS.flowKind.name}='user'], [${CHAT_ROW_ANCHORS.flowKind.name}='steering']):has(
+    ~ :is([${CHAT_ROW_ANCHORS.flowKind.name}='user'], [${CHAT_ROW_ANCHORS.flowKind.name}='steering'])
   ):focus-within .dshTweaksMessageCopy-actions {
     opacity: 1;
   }

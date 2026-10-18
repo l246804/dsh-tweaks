@@ -11,8 +11,7 @@
   ],
   "ignoreDependencies": [
     "@antfu/utils",
-    "taze",
-    "@deepseek-ai/dsh"
+    "taze"
   ],
   "ignoreBinaries": [
     "dsh"

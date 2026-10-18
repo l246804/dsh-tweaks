@@ -39,6 +39,7 @@
  * @module @leiwang2000/dsh-tweaks/client/features/file-panel/styles
  */
 
+import { TEXT_PREVIEW_ANCHORS } from '../../dom/host-anchors.ts'
 import { PANEL_CONTAINER_ATTRIBUTE, PANEL_HOST_ATTRIBUTE } from './panel-host.ts'
 
 /**
@@ -55,19 +56,22 @@ export const PANEL_WIDTH_VARIABLE = '--dsh-tweaks-file-panel-width'
 const WIDTH_FALLBACK = '260px'
 
 /** The preview root's marker, which is where the dock host is. */
-const PREVIEW_STATE_ATTRIBUTE = 'data-textpreview-state'
+const PREVIEW_STATE_ATTRIBUTE = TEXT_PREVIEW_ANCHORS.state.name
 
 /** The path label inside the preview's toolbar row, the only marker that row carries. */
-const PREVIEW_PATH_ATTRIBUTE = 'data-textpreview-path'
+const PREVIEW_PATH_ATTRIBUTE = TEXT_PREVIEW_ANCHORS.path.name
 
 /** The preview's body, where the file's content is drawn. */
-const PREVIEW_BODY_ATTRIBUTE = 'data-textpreview-body'
+const PREVIEW_BODY_ATTRIBUTE = TEXT_PREVIEW_ANCHORS.body.name
 
 /**
  * The preview's change notice, which is drawn above the toolbar when the file
  * changed underneath the reader. Either marker means the same row.
  */
-const PREVIEW_NOTICE_ATTRIBUTES: readonly string[] = ['data-textpreview-changed', 'data-textpreview-meta-failed']
+const PREVIEW_NOTICE_ATTRIBUTES: readonly string[] = [
+  TEXT_PREVIEW_ANCHORS.changed.name,
+  TEXT_PREVIEW_ANCHORS.metaFailed.name,
+]
 
 /**
  * The docked preview root: the element the panel is docked beside.

@@ -26,7 +26,7 @@ export const zh = {
   'copy': '复制',
   'copied': '复制成功',
   'copy.attachmentsSkipped': '仅复制了文字：浏览器不允许把附件写入剪贴板',
-  'copy.imagesOmitted': '有 {count} 张同格式图片无法放入剪贴板',
+  'copy.imagesOmitted': '有 {count} 张同格式的图片附件无法放入剪贴板',
   'copy.failed': '复制失败：浏览器拒绝了剪贴板写入',
 } satisfies Record<string, string>
 

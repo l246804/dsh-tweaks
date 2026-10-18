@@ -10,10 +10,12 @@
  * call site.
  *
  * The values are the kit's own `data-*` attributes, which are the stable anchors
- * ADR-0002 allows. Selector text is built through {@link attributeSelector} so
- * escaping a tab id has exactly one implementation, and the host attribute's
- * value is compared against the constants declared here rather than against a
- * literal written out again in a second place.
+ * ADR-0002 allows. Their spellings live in `host-anchors.ts`, the one module
+ * `scripts/check-anchors.mjs` verifies against the pinned upstream tree; this
+ * module adds the *reading* of them. Selector text is built through
+ * {@link attributeSelector} so escaping a tab id has exactly one implementation,
+ * and the host attribute's value is compared against the constants declared here
+ * rather than against a literal written out again in a second place.
  *
  * This module only *names* and *reads* the anchors. Every patch that depends on
  * them states its own fallback nature where it decides to patch.
@@ -21,6 +23,7 @@
  * @module @leiwang2000/dsh-tweaks/client/dom/dock-anchors
  */
 
+import { DOCKKIT_ANCHORS, SIDEBAR_RIGHT_ANCHORS } from './host-anchors.ts'
 import { attributeSelector } from './selector.ts'
 
 /**
@@ -30,34 +33,34 @@ import { attributeSelector } from './selector.ts'
  * docked or floating, which is what makes it the completeness source for "which
  * tabs exist on the page".
  */
-export const DOCKKIT_CONTENT = 'data-dockkit-content'
+export const DOCKKIT_CONTENT = DOCKKIT_ANCHORS.content.name
 
 /** The anchor stating where a tab stands: on the docked surface or in a floating pane. */
-export const DOCKKIT_HOST = 'data-dockkit-host'
+export const DOCKKIT_HOST = DOCKKIT_ANCHORS.host.name
 
 /** The anchor naming the floating pane that draws a tab. */
-export const DOCKKIT_FLOAT = 'data-dockkit-float'
+export const DOCKKIT_FLOAT = DOCKKIT_ANCHORS.float.name
 
 /** The anchor naming one chip of a pane's tab strip. */
-export const DOCKKIT_TAB = 'data-dockkit-tab'
+export const DOCKKIT_TAB = DOCKKIT_ANCHORS.tab.name
 
 /** The anchor naming the chips container of one pane's strip, by pane id. */
-export const DOCKKIT_STRIP_TABS = 'data-dockkit-strip-tabs'
+export const DOCKKIT_STRIP_TABS = DOCKKIT_ANCHORS.stripTabs.name
 
 /** The anchor wrapping a strip chip's label. Title chrome, never a body. */
-const DOCKKIT_TAB_TITLE = 'data-dockkit-tab-title'
+const DOCKKIT_TAB_TITLE = DOCKKIT_ANCHORS.tabTitle.name
 
 /** The anchor wrapping a floating pane's title. Title chrome, never a body. */
-const DOCKKIT_FLOAT_TITLE = 'data-dockkit-float-title'
+const DOCKKIT_FLOAT_TITLE = DOCKKIT_ANCHORS.floatTitle.name
 
 /** The anchor naming a floating pane's header, which holds its title. Title chrome. */
-const DOCKKIT_FLOAT_GRIP = 'data-dockkit-float-grip'
+const DOCKKIT_FLOAT_GRIP = DOCKKIT_ANCHORS.floatGrip.name
 
 /** The anchor the right sidebar writes on **both** of a tab's seats, carrying the tab id. */
-const SIDEBAR_TAB = 'data-sidebar-right-tab'
+const SIDEBAR_TAB = SIDEBAR_RIGHT_ANCHORS.tab.name
 
 /** The anchor the right sidebar writes on one session's panel, scope of every read. */
-export const SIDEBAR_SESSION = 'data-sidebar-right-session'
+export const SIDEBAR_SESSION = SIDEBAR_RIGHT_ANCHORS.session.name
 
 /** The host value meaning a tab is drawn on the docked surface. */
 export const DOCK_HOST = 'dock'

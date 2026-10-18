@@ -19,12 +19,13 @@
  */
 
 import type { ElementLike } from '../../dom/types.ts'
+import { CHAT_ROW_ANCHORS } from '../../dom/host-anchors.ts'
 
 /** The host's attribute naming a chat row's renderer kind. */
-const FLOW_KIND_ATTRIBUTE = 'data-chat-flow-kind'
+const FLOW_KIND_ATTRIBUTE = CHAT_ROW_ANCHORS.flowKind.name
 
 /** The host's attribute naming a chat row's conversation context key. */
-const NODE_KEY_ATTRIBUTE = 'data-chat-node-key'
+const NODE_KEY_ATTRIBUTE = CHAT_ROW_ANCHORS.nodeKey.name
 
 /** The row kind whose copy this feature owns. */
 const USER_ROW_KIND = 'user'
