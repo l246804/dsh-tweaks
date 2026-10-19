@@ -1,54 +1,109 @@
 # dsh-tweaks
 
-[![npm version][npm-version-src]][npm-version-href]
-[![npm downloads][npm-downloads-src]][npm-downloads-href]
-[![bundle][bundle-src]][bundle-href]
-[![JSDocs][jsdocs-src]][jsdocs-href]
-[![License][license-src]][license-href]
+DeepSeek Harness（DSH）Web GUI 的体验修正插件，当前提供三组功能：文件面板、右侧栏 tab 动作、消息复制。
 
-Tweaks that improve the DeepSeek Harness (DSH) experience.
+## 功能
 
-## Development
+### 文件面板
 
-This repo keeps an upstream copy of [deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) as a Git submodule under `deepseek-harness/`. It is reference material only. The local toolchain (ESLint, `tsc`, knip, Vitest, tsdown) explicitly excludes it, and it is never published.
+文件列表原本和它打开的文件分居两个 tab，想打开下一个文件就得回头找列表。插件把列表改成常驻面板：以 `priority: 'extension'` 接管 `files` tab 类型，内建的 files 插件本身照常运行。
 
-Clone with the submodule, or fetch it in an existing checkout:
+面板只有一个实例，在文件 tab 之间搬来搬去而不是每个 tab 各建一份。展开状态、已加载的目录层级、筛选词和滚动位置因此在 tab 之间共享，同一个目录也只监听一次。
 
-```bash
-git clone --recursive <repo-url>
-# or, in an existing checkout
-git submodule update --init --recursive
+面板的位置由当前 tab 的类型决定：
+
+| 当前 tab | 面板 |
+| --- | --- |
+| 文件列表 tab（`files`） | 占满整个正文，顶部保留内建的 38px 头部：根路径与重载按钮 |
+| 文件 tab | 停靠在正文右侧，占一列 |
+| 其他 tab（开始页、终端） | 不显示，状态保留在内存里 |
+
+点一行文件时：
+
+- 在停靠的文件列表 tab 里点一行：目标文件顶替这个 tab 的位置，不新开 tab。
+- 点一个已经开着的文件：跳到那个 tab；当前是文件列表 tab 时，一并把它收掉。
+- 在文件 tab 的面板里点一行：新 tab 开在同一个停靠区，正在读的文件留在原处，面板跟着搬过去，可以接着点下一个。
+- 浮动窗只装一个 tab，没有槽位可借，在浮动 tab 里点行按普通打开处理。
+
+切换文件 tab 时，面板把该 tab 对应的文件标成激活行，逐层展开它的祖先目录，等目录读完，再把它滚到列表中间。
+
+其他行为：
+
+- 文件 tab 的工具栏上有文件列表开关，默认开。插件把开关状态写进 `localStorage`，刷新后保留；关掉时正文占满。
+- 树区上方的筛选框按名称过滤，搜索范围是已经加载过的层级。
+- 已展开的目录订阅变更流自动刷新。刷新失败时保留旧行并给出提示。文件系统不支持 watch 时面板降级成打开时读一次，不报错。
+- 拖面板左缘改宽度，范围 180px 到正文宽度的一半，双击复位到 260px，方向键按 16px 步进。插件把宽度也写进 `localStorage`，跨刷新保留。
+- 开始页的「文件」入口照旧打开文件列表 tab。`workspace.files` 快捷键仍由内建插件注册，行为不变。
+
+### 右侧栏 tab 动作
+
+右键 tab 打开的菜单里多出三项：关闭其他、关闭左侧、关闭右侧。
+
+三项各自要关哪些 tab，在菜单展开时按停靠区的 tab 顺序算出，点击后逐个关闭。没有可关对象时该项是禁用状态而不是消失。浮动态 tab 和宿主拒绝关闭的 tab 会被跳过，一个关不掉的 tab 不会让动作停在中途。
+
+### 消息复制
+
+复制用户消息时，文本与附件一起进剪贴板。
+
+- 图片带真实数据。插件通过会话读回图片字节，按媒体类型写入剪贴板项，粘贴回输入框时仍是图片附件。
+- 文件带说明文字，形如 `report.pdf (1.5KB)`。会话只批准读回图片附件的字节，所以文件以名字和大小出现。
+- 框选消息文字后复制，产出与行上的复制按钮一致。
+- 降级时给出提示。浏览器拒绝写入附件时只复制文字，并在消息行下方挂一句提示；同一格式的第二张图片在剪贴板里没有位置可放时，按张数提示。
+
+接管范围只有用户消息行（`user`）。助手行和工具行不受影响，纯文本消息的复制结果与改动前一致。
+
+## 支持的 DSH 版本
+
+`package.json` 声明的运行时范围：
+
+```json
+{ "peerDependencies": { "@deepseek-ai/dsh": "^0.2.1-rc.2" } }
 ```
 
-Because the submodule is pinned to a specific commit, treat it as read-only. To move it to a newer upstream commit:
+DSH 判定这条 range 时打开 `includePrerelease`，实际接受 `>=0.2.1-rc.2` 且 `<0.3.0`。
+
+| 运行中的 DSH 版本 | 结果 |
+| --- | --- |
+| `0.2.1-rc.2` 及以上的 `0.2.x` | 支持 |
+| 早于 `0.2.1-rc.2`，例如 `0.2.0`、`0.2.1-alpha.5` | 不支持 |
+| `0.3.0` 及以上 | 不支持 |
+
+版本不满足时有两种表现：
+
+- `dsh plugin add` 安装前会先读插件 manifest 做兼容性预检，版本不满足就打印 `installation rejected`，原 profile 不变。
+- 插件已经装进 profile、之后运行的 DSH 换了版本时，组装 profile 会跳过这一层，启动时打印 `skipping profile bundle` 和原因。DSH 照常启动，插件不加载。
+
+`deepseek-harness/` 子模块固定在上游的 `dsh-v0.2.1-rc.2`，可能滞后于正在运行的安装。两者冲突时以 `dsh --version` 为准。
+
+## 安装
+
+从仓库路径安装：
 
 ```bash
-git -C deepseek-harness fetch origin
-git -C deepseek-harness checkout <commit-or-tag>
-git add deepseek-harness
+dsh plugin --profile web add /path/to/dsh-tweaks
 ```
 
-## Note for Developers
+发布之后可以换成包名安装：
 
-This starter recommands using [npm Trusted Publisher](https://github.com/e18e/ecosystem-issues/issues/201), where the release is done on CI to ensure the security of the packages.
+```bash
+dsh plugin --profile web add @leiwang2000/dsh-tweaks
+```
 
-To do so, you need to run `pnpm publish` manually for the very first time to create the package on npm, and then go to `https://www.npmjs.com/package/<your-package-name>/access` to set the connection to your GitHub repo.
+安装会把包写进 profile 的依赖，追加到 `dsh.profile.bundles`，并把 `cordis.patch.yml` 作为一层补丁挂上。移除用：
 
-Then for the future releases, you can run `pnpm run release` to do the release and the GitHub Actions will take care of the release process.
+```bash
+dsh plugin --profile web remove @leiwang2000/dsh-tweaks
+```
 
-## License
+## 已知缺口
 
-[MIT](./LICENSE) License © [leiwang](https://github.com/l246804)
+- 文件列表 tab 的头部没有内建的「用其他应用打开」按钮。插槽注册表对重复的 childKey 抛错，官方通道里转发不进这个座位，见 [ADR-0003](docs/adr/0003-takeover-keeps-built-in-behaviour.md)。
+- 输入框里手打 `@` 文本的引用高亮已经下线。DOM 补丁只能改外观，改不了「这段是不是引用」的判定，见 [ADR-0002](docs/adr/0002-official-channels-first.md)。
 
-<!-- Badges -->
+## 开发
 
-[npm-version-src]: https://img.shields.io/npm/v/@leiwang2000/dsh-tweaks?style=flat&colorA=080f12&colorB=1fa669
-[npm-version-href]: https://npmx.dev/package/@leiwang2000/dsh-tweaks
-[npm-downloads-src]: https://img.shields.io/npm/dm/@leiwang2000/dsh-tweaks?style=flat&colorA=080f12&colorB=1fa669
-[npm-downloads-href]: https://npmx.dev/package/@leiwang2000/dsh-tweaks
-[bundle-src]: https://img.shields.io/bundlephobia/minzip/@leiwang2000/dsh-tweaks?style=flat&colorA=080f12&colorB=1fa669&label=minzip
-[bundle-href]: https://bundlephobia.com/result?p=@leiwang2000/dsh-tweaks
-[license-src]: https://img.shields.io/github/license/l246804/dsh-tweaks.svg?style=flat&colorA=080f12&colorB=1fa669
-[license-href]: https://github.com/l246804/dsh-tweaks/blob/main/LICENSE
-[jsdocs-src]: https://img.shields.io/badge/jsdocs-reference-080f12?style=flat&colorA=080f12&colorB=1fa669
-[jsdocs-href]: https://www.jsdocs.io/package/@leiwang2000/dsh-tweaks
+构建与校验脚本见 `package.json` 的 `scripts-info`。`deepseek-harness/` 是只读参考子模块，ESLint、`tsc`、knip 与 Vitest 都已排除它。
+
+## 许可
+
+MIT
