@@ -73,7 +73,7 @@
     "prepare": "Set up git hooks and skills"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh": "^0.2.1-alpha.3"
+    "@deepseek-ai/dsh": "^0.2.1-rc.2"
   },
   "peerDependenciesMeta": {
     "@deepseek-ai/dsh": {
