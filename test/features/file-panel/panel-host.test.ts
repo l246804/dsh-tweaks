@@ -11,6 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { SIDEBAR_RIGHT_ANCHORS } from '../../../src/client/dom/host-anchors.ts'
 import { createPanelHost, PANEL_CONTAINER_ATTRIBUTE, PANEL_HOST_ATTRIBUTE } from '../../../src/client/features/file-panel/panel-host.ts'
 import { createFakeDom } from '../../helpers/dom.ts'
 import { fakeHostDom } from './fake-host-dom.ts'
@@ -20,7 +21,7 @@ function tabBodies() {
   const dom = createFakeDom()
   const body = (id: string) => {
     const element = dom.document.createElement('div')
-    element.setAttribute('data-sidebar-right-tab', id)
+    element.setAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name, id)
     return element
   }
   return { dom, body }
@@ -123,7 +124,7 @@ describe('createPanelHost', () => {
     host.attach(first, 'dock')
     host.dispose()
     // The host's own child that the shell put there survives untouched.
-    expect(first.getAttribute('data-sidebar-right-tab')).toBe('a')
+    expect(first.getAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name)).toBe('a')
     expect([...first.children]).toEqual([other])
   })
 

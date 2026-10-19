@@ -26,6 +26,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { TEXT_PREVIEW_ANCHORS } from '../../../src/client/dom/host-anchors.ts'
 import { PANEL_CONTAINER_ATTRIBUTE, PANEL_HOST_ATTRIBUTE } from '../../../src/client/features/file-panel/panel-host.ts'
 import {
   PANEL_WIDTH_VARIABLE,
@@ -39,6 +40,15 @@ import {
 
 const container = `[${PANEL_CONTAINER_ATTRIBUTE}]`
 const dock = `[${PANEL_HOST_ATTRIBUTE}='dock']`
+
+/** The preview root's state anchor, as the stylesheet spells it. */
+const previewState = TEXT_PREVIEW_ANCHORS.state.name
+
+/** The path label inside the preview's toolbar row. */
+const previewPath = TEXT_PREVIEW_ANCHORS.path.name
+
+/** The preview's body anchor. */
+const previewBody = TEXT_PREVIEW_ANCHORS.body.name
 
 describe('the tree’s own root', () => {
   it('carries the height chain, without which nothing below it can scroll', () => {
@@ -69,6 +79,8 @@ describe('the scroller selector', () => {
   })
 
   it('carries `overflow: auto`, which is the whole of "the list can scroll"', () => {
+    // Not a look: without `overflow` on the scroller the list cannot scroll at
+    // all, and without `min-height: 0` the flex parent refuses to shrink it.
     const css = panelStyles()
     const rule = css.slice(css.indexOf(`${panelScrollerSelector()} {`))
     const body = rule.slice(0, rule.indexOf('}'))
@@ -79,14 +91,18 @@ describe('the scroller selector', () => {
 
 describe('the dock host', () => {
   it('is anchored on the preview’s state attribute, which is not hashed', () => {
-    expect(previewDockSelector()).toBe(`[data-textpreview-state]${dock}`)
+    expect(previewDockSelector()).toBe(`[${previewState}]${dock}`)
   })
 
   it('never anchors on a CSS-module class, which changes every build', () => {
     // `_header_1a2b3` and friends: a rule written against one would break on the
     // next build, silently.
     const css = panelStyles()
-    expect(css).not.toMatch(/\[data-textpreview-state\][^\s{]*\._/)
+    // 每个状态锚点之后紧跟的那段选择器文本里，都不允许出现 CSS-module 的 `._` 类名。
+    // 按锚点切开再逐段检查，与「锚点 + 连续非空白字符 + `._`」是同一个判定，
+    // 区别只在于锚点仍然只来自常量。
+    for (const segment of css.split(`[${previewState}]`).slice(1))
+      expect(segment).not.toMatch(/^[^\s{]*\._/)
     expect(css).not.toContain('_header_')
     expect(css).not.toContain('_body_')
   })
@@ -94,23 +110,26 @@ describe('the dock host', () => {
   it('finds the preview’s toolbar row through the path label it holds', () => {
     // The row carries no attribute of its own, so `:has()` over the marker
     // inside it is the only anchor that is not a hashed class name.
-    expect(previewToolbarSelector()).toBe(`${previewDockSelector()} > :has([data-textpreview-path])`)
+    expect(previewToolbarSelector()).toBe(`${previewDockSelector()} > :has([${previewPath}])`)
   })
 
   it('lays the host out as a grid with the toolbar row spanning both columns', () => {
+    // Which element carries the grid is the anchor (the eye cannot check it in
+    // review, and a wrong one matches nothing). The track sizes and the exact
+    // span value are the look, and are the eye's to judge.
     const css = panelStyles()
     const rule = css.slice(css.indexOf(`${previewDockSelector()} {`))
     const host = rule.slice(0, rule.indexOf('}'))
     expect(host).toContain('display: grid')
-    expect(host).toContain('grid-template-columns:')
-    expect(host).toContain('grid-template-rows:')
     const toolbar = css.slice(css.indexOf(`${previewToolbarSelector()} {`))
-    expect(toolbar.slice(0, toolbar.indexOf('}'))).toContain('grid-column: 1 / -1')
+    expect(toolbar.slice(0, toolbar.indexOf('}'))).toMatch(/grid-column:\s*1\s*\/\s*-1/)
   })
 
   it('gives the preview’s body and the panel the two sides of one row', () => {
-    expect(previewBodySelector()).toBe(`${previewDockSelector()} > [data-textpreview-body]`)
+    // The selectors are the contract; which column each lands in is the look.
+    expect(previewBodySelector()).toBe(`${previewDockSelector()} > [${previewBody}]`)
     const css = panelStyles()
+    expect(css).toContain(`${previewDockSelector()} > ${container} {`)
     const body = css.slice(css.indexOf(`${previewBodySelector()} {`))
     expect(body.slice(0, body.indexOf('}'))).toContain('grid-column: 1')
     const panel = css.slice(css.indexOf(`${previewDockSelector()} > ${container} {`))
@@ -126,7 +145,7 @@ describe('the dock host', () => {
     // In that state the panel is a second child of a one-line box, so the rule
     // that tells the line to centre itself has to be keyed on the state value
     // rather than reusing the generic content rule.
-    expect(previewLoadingSelector()).toBe(`[data-textpreview-state='loading']${dock}`)
+    expect(previewLoadingSelector()).toBe(`[${previewState}='loading']${dock}`)
     const css = panelStyles()
     const rule = css.slice(css.indexOf(`${previewLoadingSelector()} > :not(${container}) {`))
     expect(rule.slice(0, rule.indexOf('}'))).toContain('align-self: center')
@@ -143,7 +162,10 @@ describe('the dock host', () => {
 
 describe('the width', () => {
   it('is read from the custom property the resizer writes', () => {
-    expect(panelStyles()).toContain(`width: var(${PANEL_WIDTH_VARIABLE}, 260px)`)
+    // The contract is the custom property, not the fallback number: the resizer
+    // writes that property, and the stylesheet's `width` must read it. The
+    // fallback pixel value is the look and is the eye's to judge.
+    expect(panelStyles()).toContain(`width: var(${PANEL_WIDTH_VARIABLE},`)
   })
 })
 

@@ -27,6 +27,7 @@ import type { DirectoryIo, ListOutcome } from '../../../src/client/features/file
 import type { PanelMount, PanelRenderer, PanelView } from '../../../src/client/features/file-panel/panel-mount.ts'
 import type { FakeNode } from './fake-host-dom.ts'
 import { describe, expect, it } from 'vitest'
+import { SIDEBAR_RIGHT_ANCHORS } from '../../../src/client/dom/host-anchors.ts'
 import { createPanelController } from '../../../src/client/features/file-panel/controller.ts'
 import { createPanelMount } from '../../../src/client/features/file-panel/panel-mount.ts'
 import { revealRow } from '../../../src/client/features/file-panel/reveal.ts'
@@ -188,7 +189,7 @@ async function mount(levels: Levels) {
 
   const body = (id: string) => {
     const element = fake.document.createElement('section')
-    element.setAttribute('data-sidebar-right-tab', id)
+    element.setAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name, id)
     fake.document.body.appendChild(element)
     return element
   }

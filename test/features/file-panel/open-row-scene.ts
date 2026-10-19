@@ -39,6 +39,8 @@ import type { FakeDom } from '../../helpers/dom.ts'
 import type { RecordingScope } from '../../helpers/scope.ts'
 import type { FakeNode } from './fake-host-dom.ts'
 import { fileAddressFor } from '@deepseek-ai/dsh-util-workspace-path'
+import { DOCKKIT_ANCHORS, SIDEBAR_RIGHT_ANCHORS } from '../../../src/client/dom/host-anchors.ts'
+import { attributeSelector } from '../../../src/client/dom/selector.ts'
 import { install } from '../../../src/client/features/file-panel/index.ts'
 import { PANEL_CONTAINER_ATTRIBUTE, PANEL_HOST_ATTRIBUTE } from '../../../src/client/features/file-panel/panel-host.ts'
 import { createFakeDom } from '../../helpers/dom.ts'
@@ -210,11 +212,11 @@ export function openRowScene(scene: Scene, latest: () => RenderProps | undefined
   const drawCell = (tabId: string, floating: boolean): void => {
     undrawCell(tabId)
     const host = document.createElement('div')
-    host.setAttribute('data-dockkit-host', floating ? 'float' : 'dock')
+    host.setAttribute(DOCKKIT_ANCHORS.host.name, floating ? 'float' : 'dock')
     const content = document.createElement('section')
-    content.setAttribute('data-dockkit-content', tabId)
+    content.setAttribute(DOCKKIT_ANCHORS.content.name, tabId)
     const wrapper = document.createElement('div')
-    wrapper.setAttribute('data-sidebar-right-tab', tabId)
+    wrapper.setAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name, tabId)
     content.appendChild(wrapper)
     host.appendChild(content)
     document.body.appendChild(host)
@@ -371,8 +373,8 @@ export function openRowScene(scene: Scene, latest: () => RenderProps | undefined
     containers: () => [...document.querySelectorAll(`[${PANEL_CONTAINER_ATTRIBUTE}]`)],
     homeTabId: () => {
       const container = document.querySelector(`[${PANEL_CONTAINER_ATTRIBUTE}]`)
-      const wrapper = container?.closest('[data-sidebar-right-tab]')
-      return wrapper?.getAttribute('data-sidebar-right-tab') ?? undefined
+      const wrapper = container?.closest(attributeSelector(SIDEBAR_RIGHT_ANCHORS.tab.name))
+      return wrapper?.getAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name) ?? undefined
     },
     homeMode: () => {
       const container = document.querySelector(`[${PANEL_CONTAINER_ATTRIBUTE}]`)

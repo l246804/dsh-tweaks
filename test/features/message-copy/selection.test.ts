@@ -19,6 +19,7 @@
 
 import type { ElementLike } from '../../../src/client/dom/types.ts'
 import { describe, expect, it } from 'vitest'
+import { CHAT_ROW_ANCHORS } from '../../../src/client/dom/host-anchors.ts'
 import { chatRowKey, copyableRowKey } from '../../../src/client/features/message-copy/selection.ts'
 import { createFakeDom } from '../../helpers/dom.ts'
 
@@ -31,8 +32,8 @@ import { createFakeDom } from '../../helpers/dom.ts'
  */
 function row(dom: ReturnType<typeof createFakeDom>, kind: string, key: string): ElementLike {
   const wrapper = dom.document.createElement('div')
-  wrapper.setAttribute('data-chat-flow-kind', kind)
-  wrapper.setAttribute('data-chat-node-key', key)
+  wrapper.setAttribute(CHAT_ROW_ANCHORS.flowKind.name, kind)
+  wrapper.setAttribute(CHAT_ROW_ANCHORS.nodeKey.name, key)
   dom.document.body.appendChild(wrapper)
   return wrapper
 }
@@ -81,7 +82,7 @@ describe('resolving a selected node to its chat row', () => {
   it('resolves nothing when the wrapper carries no key', () => {
     const dom = createFakeDom()
     const wrapper = dom.document.createElement('div')
-    wrapper.setAttribute('data-chat-flow-kind', 'user')
+    wrapper.setAttribute(CHAT_ROW_ANCHORS.flowKind.name, 'user')
     dom.document.body.appendChild(wrapper)
 
     expect(chatRowKey(wrapper)).toBeUndefined()

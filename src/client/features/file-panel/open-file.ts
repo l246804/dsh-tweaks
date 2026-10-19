@@ -99,11 +99,13 @@ export function planOpenFile<Id extends string>(input: OpenFileInput<Id>): OpenF
   const { address, current, open, canClose, currentDocked, currentIsFilesPage } = input
   const existing = open.find(tab => tab.contentId === address)
   if (existing !== undefined) {
-    // Same tab: nothing to reveal and nothing to close. Saying so keeps the
-    // executor from closing the tab it was just asked to focus.
-    const closeTabIds = current !== undefined && current.id !== existing.id && canClose(current.id)
-      ? [current.id]
-      : []
+    // Same tab: nothing to reveal and nothing to close.
+    //
+    // Only the file list page is done with once its file is on screen. A file
+    // tab holding a docked panel keeps its place, or the panel would leave with
+    // it and the reader could not click the next file.
+    const acting = current !== undefined && current.id !== existing.id && canClose(current.id)
+    const closeTabIds = acting && currentIsFilesPage ? [current.id] : []
     return { kind: 'focus', focusTabId: existing.id, closeTabIds }
   }
   // Both facts are required: only a docked *file list* lends its slot. Any

@@ -24,6 +24,8 @@
 import type { OpenFilePlan, OpenFileSidebar, OpenTabLike } from '../../../src/client/features/file-panel/open-file.ts'
 import type { OpenRowScene, RenderProps, Scene } from './open-row-scene.ts'
 import { describe, expect, it, vi } from 'vitest'
+import { DOCKKIT_ANCHORS } from '../../../src/client/dom/host-anchors.ts'
+import { attributeSelector } from '../../../src/client/dom/selector.ts'
 import { applyOpenFilePlan, planOpenFile } from '../../../src/client/features/file-panel/open-file.ts'
 import { openRowScene } from './open-row-scene.ts'
 
@@ -140,10 +142,9 @@ describe('planOpenFile', () => {
   })
 
   it('focuses an existing tab without closing the file tab the panel sits in', () => {
-    // The files-page fact must not leak into the focus rule: a file tab is only
-    // ever replaced, never closed on someone else's behalf. It is closed here
-    // because the tab being focused is a different one, which is the unchanged
-    // rule for every acting tab.
+    // A file tab holding the docked panel keeps its place: closing it would take
+    // the panel with it and end the run of clicks the panel exists for. Only the
+    // file list page is finished with once its file is on screen.
     const current = fileTab('tab-a', 'src/a.ts')
     const target = fileTab('tab-b', 'src/b.ts')
     const plan = planOpenFile({
@@ -154,7 +155,7 @@ describe('planOpenFile', () => {
       currentDocked: true,
       currentIsFilesPage: false,
     })
-    expect(plan).toEqual({ kind: 'focus', focusTabId: 'tab-b', closeTabIds: ['tab-a'] })
+    expect(plan).toEqual({ kind: 'focus', focusTabId: 'tab-b', closeTabIds: [] })
   })
 
   it('keeps the current tab when the host cannot close it', () => {
@@ -397,8 +398,9 @@ describe('opening a file from a row, through the installed feature', () => {
     // Fixture check, so this test cannot pass for the wrong reason: the tab the
     // row is clicked from must really be drawn as floating by the kit's own
     // anchor, or `isDocked` would be reporting on something else entirely.
-    const section = scene.document.querySelector('[data-dockkit-content="tab-files"]')
-    expect(section?.closest('[data-dockkit-host]')?.getAttribute('data-dockkit-host')).toBe('float')
+    const section = scene.document.querySelector(attributeSelector(DOCKKIT_ANCHORS.content.name, 'tab-files'))
+    const host = section?.closest(attributeSelector(DOCKKIT_ANCHORS.host.name))
+    expect(host?.getAttribute(DOCKKIT_ANCHORS.host.name)).toBe('float')
 
     scene.open('/w/src/b.ts')
 
@@ -425,7 +427,7 @@ describe('opening a file from a row, through the installed feature', () => {
 
     // Fixture check: the shell really has not drawn this tab, which is the only
     // reason the answer below is "no slot".
-    expect(scene.document.querySelector('[data-dockkit-content="tab-files"]')).toBeNull()
+    expect(scene.document.querySelector(attributeSelector(DOCKKIT_ANCHORS.content.name, 'tab-files'))).toBeNull()
 
     scene.open('/w/src/b.ts')
 
@@ -440,9 +442,9 @@ describe('opening a file from a row, through the installed feature', () => {
     // which pins the fact `openRow` reads out of the page. One at a time: the
     // install reaches the page through the global `document`.
     const hostOf = (scene: OpenRowScene): string | undefined =>
-      scene.document.querySelector('[data-dockkit-content="tab-files"]')
-        ?.closest('[data-dockkit-host]')
-        ?.getAttribute('data-dockkit-host') ?? undefined
+      scene.document.querySelector(attributeSelector(DOCKKIT_ANCHORS.content.name, 'tab-files'))
+        ?.closest(attributeSelector(DOCKKIT_ANCHORS.host.name))
+        ?.getAttribute(DOCKKIT_ANCHORS.host.name) ?? undefined
 
     const docked = openRowScene(base, latestProps)
     await docked.settle()

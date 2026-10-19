@@ -11,6 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { DOCKKIT_ANCHORS, SIDEBAR_RIGHT_ANCHORS, TEXT_PREVIEW_ANCHORS } from '../../../src/client/dom/host-anchors.ts'
 import {
   dockContentSelector,
   findTabBody,
@@ -20,8 +21,11 @@ import { createFakeDom } from '../../helpers/dom.ts'
 
 describe('selectors', () => {
   it('names the tab by its id, on the anchors the host writes itself', () => {
-    expect(dockContentSelector('t-1')).toBe('[data-dockkit-content="t-1"]')
-    expect(sidebarTabSelector('t-1')).toBe('[data-sidebar-right-tab="t-1"]')
+    // 期望值这里手写选择器文本、只把属性名取自锚点常量：两个被测函数内部正是
+    // 调用 `attributeSelector`，若期望值也用它生成，断言就退化成拿被测代码比它
+    // 自己，方括号、引号这些拼装契约再也测不出来。
+    expect(dockContentSelector('t-1')).toBe(`[${DOCKKIT_ANCHORS.content.name}="t-1"]`)
+    expect(sidebarTabSelector('t-1')).toBe(`[${SIDEBAR_RIGHT_ANCHORS.tab.name}="t-1"]`)
   })
 
   it('escapes a quote so an exotic id cannot break out of the attribute value', () => {
@@ -29,8 +33,9 @@ describe('selectors', () => {
     // (`dom/selector.ts`), which emits the CSS hex escape rather than a
     // backslash-quote: both keep the value inside the quotes, and only one of
     // them has to be re-derived here.
-    expect(sidebarTabSelector('a"b')).toBe('[data-sidebar-right-tab="a\\22 b"]')
-    expect(dockContentSelector('a\\b')).toBe('[data-dockkit-content="a\\5c b"]')
+    // 同上：转义文本就是这条断言的载荷，必须手写，否则转义坏掉也照样绿。
+    expect(sidebarTabSelector('a"b')).toBe(`[${SIDEBAR_RIGHT_ANCHORS.tab.name}="a\\22 b"]`)
+    expect(dockContentSelector('a\\b')).toBe(`[${DOCKKIT_ANCHORS.content.name}="a\\5c b"]`)
   })
 })
 
@@ -39,9 +44,9 @@ describe('findTabBody', () => {
   function shell(tabId: string) {
     const dom = createFakeDom()
     const section = dom.document.createElement('section')
-    section.setAttribute('data-dockkit-content', tabId)
+    section.setAttribute(DOCKKIT_ANCHORS.content.name, tabId)
     const wrapper = dom.document.createElement('div')
-    wrapper.setAttribute('data-sidebar-right-tab', tabId)
+    wrapper.setAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name, tabId)
     section.appendChild(wrapper)
     dom.document.body.appendChild(section)
     return { dom, section, wrapper }
@@ -62,18 +67,25 @@ describe('findTabBody', () => {
    */
   function realTab(dom: ReturnType<typeof createFakeDom>, tabId: string) {
     const section = dom.document.createElement('section')
-    section.setAttribute('data-dockkit-content', tabId)
+    section.setAttribute(DOCKKIT_ANCHORS.content.name, tabId)
     const header = dom.document.createElement('div')
     const strip = dom.document.createElement('div')
+    // `data-dockkit-strip` 是上游真实存在的旁支标记（`ui-dockkit` 的测量代码读它），
+    // 但本插件一个地方都不读，所以 `host-anchors.ts` 没有为它立常量；这里只是复刻
+    // 一份真实结构的噪音，留着字面量，别为它新增锚点。
+    // eslint-disable-next-line no-restricted-syntax -- 上游真实存在、本插件从不读取的布景属性
     strip.setAttribute('data-dockkit-strip', 'pane-1')
     const stripTabs = dom.document.createElement('div')
-    stripTabs.setAttribute('data-dockkit-strip-tabs', 'pane-1')
+    stripTabs.setAttribute(DOCKKIT_ANCHORS.stripTabs.name, 'pane-1')
     const chip = dom.document.createElement('div')
-    chip.setAttribute('data-dockkit-tab', tabId)
+    chip.setAttribute(DOCKKIT_ANCHORS.tab.name, tabId)
     const titleBox = dom.document.createElement('span')
-    titleBox.setAttribute('data-dockkit-tab-title', '')
+    titleBox.setAttribute(DOCKKIT_ANCHORS.tabTitle.name, '')
     const title = dom.document.createElement('span')
-    title.setAttribute('data-sidebar-right-tab', tabId)
+    title.setAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name, tabId)
+    // 复刻宿主真实标记里的噪音：本插件不读这个属性，`host-anchors.ts` 也就没有它，
+    // 因此这里保留字面量（加进来只会得到一个没人读、却要跟着上游校验的常量）。
+    // eslint-disable-next-line no-restricted-syntax -- 同上：不读它，故不立锚点常量
     title.setAttribute('data-sidebar-right-occurrence', `occ-${tabId}`)
     titleBox.appendChild(title)
     chip.appendChild(titleBox)
@@ -82,7 +94,8 @@ describe('findTabBody', () => {
     header.appendChild(strip)
     const bodyHost = dom.document.createElement('div')
     const body = dom.document.createElement('div')
-    body.setAttribute('data-sidebar-right-tab', tabId)
+    body.setAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name, tabId)
+    // eslint-disable-next-line no-restricted-syntax -- 同上：不读它，故不立锚点常量
     body.setAttribute('data-sidebar-right-occurrence', `occ-${tabId}`)
     bodyHost.appendChild(body)
     section.appendChild(header)
@@ -105,14 +118,16 @@ describe('findTabBody', () => {
   function previewTab(dom: ReturnType<typeof createFakeDom>, tabId: string, state = 'text') {
     const { section, title, body } = realTab(dom, tabId)
     const preview = dom.document.createElement('div')
-    preview.setAttribute('data-textpreview-state', state)
+    preview.setAttribute(TEXT_PREVIEW_ANCHORS.state.name, state)
+    // 同上：预览根的地址属性是实现细节的噪音，本插件从不读它，故保留字面量。
+    // eslint-disable-next-line no-restricted-syntax -- 同上：预览地址属布景噪音，本插件不读
     preview.setAttribute('data-textpreview-url', `dsh-resource://file/session/s1/${tabId}.ts`)
     const toolbar = dom.document.createElement('div')
     const path = dom.document.createElement('span')
-    path.setAttribute('data-textpreview-path', '')
+    path.setAttribute(TEXT_PREVIEW_ANCHORS.path.name, '')
     toolbar.appendChild(path)
     const content = dom.document.createElement('div')
-    content.setAttribute('data-textpreview-body', '')
+    content.setAttribute(TEXT_PREVIEW_ANCHORS.body.name, '')
     preview.appendChild(toolbar)
     preview.appendChild(content)
     body.appendChild(preview)
@@ -176,20 +191,20 @@ describe('findTabBody', () => {
   it('takes the body of a floating pane, whose title hangs off a float header', () => {
     const dom = createFakeDom()
     const section = dom.document.createElement('section')
-    section.setAttribute('data-dockkit-content', 't-1')
+    section.setAttribute(DOCKKIT_ANCHORS.content.name, 't-1')
     const header = dom.document.createElement('header')
-    header.setAttribute('data-dockkit-float-grip', 'pane-1')
+    header.setAttribute(DOCKKIT_ANCHORS.floatGrip.name, 'pane-1')
     const floatTitle = dom.document.createElement('div')
-    floatTitle.setAttribute('data-dockkit-float-title', '')
+    floatTitle.setAttribute(DOCKKIT_ANCHORS.floatTitle.name, '')
     const titleBox = dom.document.createElement('span')
-    titleBox.setAttribute('data-dockkit-tab-title', '')
+    titleBox.setAttribute(DOCKKIT_ANCHORS.tabTitle.name, '')
     const title = dom.document.createElement('span')
-    title.setAttribute('data-sidebar-right-tab', 't-1')
+    title.setAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name, 't-1')
     titleBox.appendChild(title)
     floatTitle.appendChild(titleBox)
     header.appendChild(floatTitle)
     const body = dom.document.createElement('div')
-    body.setAttribute('data-sidebar-right-tab', 't-1')
+    body.setAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name, 't-1')
     section.appendChild(header)
     section.appendChild(body)
     dom.document.body.appendChild(section)
@@ -199,9 +214,9 @@ describe('findTabBody', () => {
   it('takes the body when only one seat is rendered, whichever it is', () => {
     const dom = createFakeDom()
     const section = dom.document.createElement('section')
-    section.setAttribute('data-dockkit-content', 't-1')
+    section.setAttribute(DOCKKIT_ANCHORS.content.name, 't-1')
     const body = dom.document.createElement('div')
-    body.setAttribute('data-sidebar-right-tab', 't-1')
+    body.setAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name, 't-1')
     section.appendChild(body)
     dom.document.body.appendChild(section)
     expect(findTabBody(dom.document, 't-1', 'page')).toBe(body)
@@ -213,13 +228,13 @@ describe('findTabBody', () => {
     // section rather than into the label.
     const dom = createFakeDom()
     const section = dom.document.createElement('section')
-    section.setAttribute('data-dockkit-content', 't-1')
+    section.setAttribute(DOCKKIT_ANCHORS.content.name, 't-1')
     const strip = dom.document.createElement('div')
-    strip.setAttribute('data-dockkit-strip-tabs', 'pane-1')
+    strip.setAttribute(DOCKKIT_ANCHORS.stripTabs.name, 'pane-1')
     const chip = dom.document.createElement('div')
-    chip.setAttribute('data-dockkit-tab', 't-1')
+    chip.setAttribute(DOCKKIT_ANCHORS.tab.name, 't-1')
     const title = dom.document.createElement('span')
-    title.setAttribute('data-sidebar-right-tab', 't-1')
+    title.setAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name, 't-1')
     chip.appendChild(title)
     strip.appendChild(chip)
     section.appendChild(strip)
@@ -232,7 +247,7 @@ describe('findTabBody', () => {
   it('falls back to the docking kit section when the wrapper is not rendered', () => {
     const dom = createFakeDom()
     const section = dom.document.createElement('section')
-    section.setAttribute('data-dockkit-content', 't-1')
+    section.setAttribute(DOCKKIT_ANCHORS.content.name, 't-1')
     dom.document.body.appendChild(section)
     expect(findTabBody(dom.document, 't-1', 'page')).toBe(section)
     expect(findTabBody(dom.document, 't-1', 'dock')).toBe(section)
@@ -247,8 +262,8 @@ describe('findTabBody', () => {
   it('does not confuse one tab id with another that starts the same way', () => {
     const { dom } = shell('t-1')
     const other = dom.document.createElement('div')
-    other.setAttribute('data-sidebar-right-tab', 't-10')
+    other.setAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name, 't-10')
     dom.document.body.appendChild(other)
-    expect(findTabBody(dom.document, 't-1', 'page')?.getAttribute('data-sidebar-right-tab')).toBe('t-1')
+    expect(findTabBody(dom.document, 't-1', 'page')?.getAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name)).toBe('t-1')
   })
 })

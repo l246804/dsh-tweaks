@@ -22,6 +22,7 @@
 
 import type { ClipboardWriter, CopyEventData, CopyOutcome } from '../../../src/client/features/message-copy/clipboard.ts'
 import { describe, expect, it, vi } from 'vitest'
+import { CHAT_ROW_ANCHORS } from '../../../src/client/dom/host-anchors.ts'
 import { installCopyListener } from '../../../src/client/features/message-copy/listener.ts'
 import { messageContent } from '../../../src/client/features/message-copy/payload.ts'
 import { performCopy } from '../../../src/client/features/message-copy/perform-copy.ts'
@@ -102,8 +103,8 @@ function textOnlyWriter(): ClipboardWriter {
 /** A row wrapper carrying the host's two chat-row anchors. */
 function rowElement(dom: ReturnType<typeof createFakeDom>, kind: string, key: string) {
   const wrapper = dom.document.createElement('div')
-  wrapper.setAttribute('data-chat-flow-kind', kind)
-  wrapper.setAttribute('data-chat-node-key', key)
+  wrapper.setAttribute(CHAT_ROW_ANCHORS.flowKind.name, kind)
+  wrapper.setAttribute(CHAT_ROW_ANCHORS.nodeKey.name, key)
   dom.document.body.appendChild(wrapper)
   return wrapper
 }

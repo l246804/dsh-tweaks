@@ -16,6 +16,11 @@ import type { SessionId } from '@deepseek-ai/dsh-api-remotes/client'
 import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { DockingOptions, OpenTab, SidebarFacts } from '../../../src/client/features/file-panel/docking.ts'
 import { describe, expect, it, vi } from 'vitest'
+import {
+  DOCKKIT_ANCHORS,
+  SIDEBAR_RIGHT_ANCHORS,
+  TEXT_PREVIEW_ANCHORS,
+} from '../../../src/client/dom/host-anchors.ts'
 import { createDocking, resolveDockTarget } from '../../../src/client/features/file-panel/docking.ts'
 import { createFakeDom } from '../../helpers/dom.ts'
 import { sessionId, tabId } from './ids.ts'
@@ -127,9 +132,9 @@ function harness(initialTabs: readonly OpenTab[] = [filesTab, textTab]) {
   /** Add one tab's body elements to the document, the way the shell renders them. */
   const renderBody = (tabId: string): void => {
     const section = dom.document.createElement('section')
-    section.setAttribute('data-dockkit-content', tabId)
+    section.setAttribute(DOCKKIT_ANCHORS.content.name, tabId)
     const wrapper = dom.document.createElement('div')
-    wrapper.setAttribute('data-sidebar-right-tab', tabId)
+    wrapper.setAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name, tabId)
     section.appendChild(wrapper)
     dom.document.body.appendChild(section)
   }
@@ -144,22 +149,22 @@ function harness(initialTabs: readonly OpenTab[] = [filesTab, textTab]) {
    */
   const renderRealTab = (tabId: string): void => {
     const section = dom.document.createElement('section')
-    section.setAttribute('data-dockkit-content', tabId)
+    section.setAttribute(DOCKKIT_ANCHORS.content.name, tabId)
     const header = dom.document.createElement('div')
     const stripTabs = dom.document.createElement('div')
-    stripTabs.setAttribute('data-dockkit-strip-tabs', 'pane-1')
+    stripTabs.setAttribute(DOCKKIT_ANCHORS.stripTabs.name, 'pane-1')
     const chip = dom.document.createElement('div')
-    chip.setAttribute('data-dockkit-tab', tabId)
+    chip.setAttribute(DOCKKIT_ANCHORS.tab.name, tabId)
     const titleBox = dom.document.createElement('span')
-    titleBox.setAttribute('data-dockkit-tab-title', '')
+    titleBox.setAttribute(DOCKKIT_ANCHORS.tabTitle.name, '')
     const title = dom.document.createElement('span')
-    title.setAttribute('data-sidebar-right-tab', tabId)
+    title.setAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name, tabId)
     titleBox.appendChild(title)
     chip.appendChild(titleBox)
     stripTabs.appendChild(chip)
     header.appendChild(stripTabs)
     const body = dom.document.createElement('div')
-    body.setAttribute('data-sidebar-right-tab', tabId)
+    body.setAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name, tabId)
     section.appendChild(header)
     section.appendChild(body)
     dom.document.body.appendChild(section)
@@ -175,13 +180,13 @@ function harness(initialTabs: readonly OpenTab[] = [filesTab, textTab]) {
   const renderPreviewRoot = (tabId: string): unknown => {
     const body = seats.get(tabId)?.body as { appendChild: (child: unknown) => void }
     const preview = dom.document.createElement('div')
-    preview.setAttribute('data-textpreview-state', 'text')
+    preview.setAttribute(TEXT_PREVIEW_ANCHORS.state.name, 'text')
     const toolbar = dom.document.createElement('div')
     const path = dom.document.createElement('span')
-    path.setAttribute('data-textpreview-path', '')
+    path.setAttribute(TEXT_PREVIEW_ANCHORS.path.name, '')
     toolbar.appendChild(path)
     const content = dom.document.createElement('div')
-    content.setAttribute('data-textpreview-body', '')
+    content.setAttribute(TEXT_PREVIEW_ANCHORS.body.name, '')
     preview.appendChild(toolbar)
     preview.appendChild(content)
     body.appendChild(preview)
@@ -263,9 +268,10 @@ describe('the docking loop', () => {
     const docking = createDocking(h.options)
     h.flush()
 
-    const element = h.placedElements.at(-1) as { getAttribute: (name: string) => string | null, tagName: string } | undefined
-    expect(element?.getAttribute('data-sidebar-right-tab')).toBe('tab-files')
-    expect(element?.tagName).toBe('DIV')
+    const element = h.placedElements.at(-1) as { getAttribute: (name: string) => string | null } | undefined
+    expect(element?.getAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name)).toBe('tab-files')
+    // The identity that matters is *which* seat, not which tag it happens to be:
+    // the body is the element the host calls the body, and never the title.
     expect(h.dom.bodyOf('tab-files')).toBe(element)
     expect(h.dom.titleOf('tab-files')).not.toBe(element)
     docking.dispose()

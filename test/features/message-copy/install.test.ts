@@ -18,6 +18,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest'
+import { CHAT_ROW_ANCHORS } from '../../../src/client/dom/host-anchors.ts'
 import { createFakeDom } from '../../helpers/dom.ts'
 import { createRecordingScope } from '../../helpers/scope.ts'
 
@@ -164,8 +165,8 @@ describe('installing the message-copy tweak', () => {
       // the registry is empty.
       scope.disposeAll()
       const wrapper = dom.document.createElement('div')
-      wrapper.setAttribute('data-chat-flow-kind', 'user')
-      wrapper.setAttribute('data-chat-node-key', '4:userm-1')
+      wrapper.setAttribute(CHAT_ROW_ANCHORS.flowKind.name, 'user')
+      wrapper.setAttribute(CHAT_ROW_ANCHORS.nodeKey.name, '4:userm-1')
       dom.document.body.appendChild(wrapper)
       const copy = vi.fn()
       dom.document.dispatchEvent({ type: 'copy', target: wrapper, clipboardData: { setData: copy } })

@@ -45,6 +45,7 @@ import type { ReactElement } from 'react'
 import type { FakeDom } from '../helpers/dom.ts'
 import { Context, Service } from '@deepseek-ai/cordis'
 import { renderToStaticMarkup } from 'react-dom/server'
+import { DOCKKIT_ANCHORS, SIDEBAR_RIGHT_ANCHORS } from '../../src/client/dom/host-anchors.ts'
 import { createFakeDom } from '../helpers/dom.ts'
 
 /** The session the scene's sidebar is showing. */
@@ -349,13 +350,13 @@ export interface RenderLog {
 /** How the scene draws one tab's body, the way the docking kit draws it. */
 function drawTabBody(document: FakeDom['document'], tabId: string): void {
   const host = document.createElement('div')
-  host.setAttribute('data-dockkit-host', 'dock')
+  host.setAttribute(DOCKKIT_ANCHORS.host.name, 'dock')
   const section = document.createElement('section')
-  section.setAttribute('data-dockkit-content', tabId)
+  section.setAttribute(DOCKKIT_ANCHORS.content.name, tabId)
   // The sidebar's body seat. The title seat is skipped by `findTabBody`, so the
   // drawn shape has to carry the body seat inside the tab's own section.
   const body = document.createElement('div')
-  body.setAttribute('data-sidebar-right-tab', tabId)
+  body.setAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name, tabId)
   section.appendChild(body)
   host.appendChild(section)
   document.body.appendChild(host)

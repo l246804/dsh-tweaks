@@ -31,6 +31,7 @@ import type { MenuItemComponent, MenuItemRegistration, TabActionsHost } from '..
 import type { FakeDom } from '../../helpers/dom.ts'
 import type { RecordingScope } from '../../helpers/scope.ts'
 import { describe, expect, it, vi } from 'vitest'
+import { DOCKKIT_ANCHORS, SIDEBAR_RIGHT_ANCHORS } from '../../../src/client/dom/host-anchors.ts'
 import { MENU_IDS } from '../../../src/client/features/tab-actions/index.ts'
 import { writeMenu } from '../../../src/client/features/tab-actions/menu.ts'
 import { createFakeDom } from '../../helpers/dom.ts'
@@ -86,10 +87,13 @@ interface Harness {
  */
 function host(document: StandIn, into: ElementLike, tabId: string, floating: boolean, paneId: string): void {
   const cell = document.createElement('div')
-  cell.setAttribute('data-dockkit-host', floating ? 'float' : 'dock')
+  cell.setAttribute(DOCKKIT_ANCHORS.host.name, floating ? 'float' : 'dock')
   const section = document.createElement('section')
-  section.setAttribute('data-dockkit-content', tabId)
-  section.setAttribute(floating ? 'data-dockkit-float' : 'data-dockkit-pane', paneId)
+  section.setAttribute(DOCKKIT_ANCHORS.content.name, tabId)
+  // `data-dockkit-pane` 是上游写的属性，本插件从不读它，`host-anchors.ts` 也就没有
+  // 收录；这里保留字面量，只是把 kit 的嵌套画全。
+  // eslint-disable-next-line no-restricted-syntax -- 上游 kit 的 pane 标记，本插件从不读取
+  section.setAttribute(floating ? DOCKKIT_ANCHORS.float.name : 'data-dockkit-pane', paneId)
   cell.appendChild(section)
   into.appendChild(cell)
 }
@@ -97,14 +101,14 @@ function host(document: StandIn, into: ElementLike, tabId: string, floating: boo
 /** Draw one Session's sidebar into the stand-in document. */
 function draw(document: StandIn, sessionId: string, scene: Scene): void {
   const view = document.createElement('div')
-  view.setAttribute('data-sidebar-right-session', sessionId)
+  view.setAttribute(SIDEBAR_RIGHT_ANCHORS.session.name, sessionId)
   document.body.appendChild(view)
   for (const [paneId, tabIds] of Object.entries(scene.panes)) {
     const strip = document.createElement('div')
-    strip.setAttribute('data-dockkit-strip-tabs', paneId)
+    strip.setAttribute(DOCKKIT_ANCHORS.stripTabs.name, paneId)
     for (const id of tabIds) {
       const chip = document.createElement('div')
-      chip.setAttribute('data-dockkit-tab', id)
+      chip.setAttribute(DOCKKIT_ANCHORS.tab.name, id)
       strip.appendChild(chip)
     }
     view.appendChild(strip)

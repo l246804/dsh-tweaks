@@ -28,6 +28,8 @@
 
 import type { ReactElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import { SIDEBAR_RIGHT_ANCHORS } from '../../src/client/dom/host-anchors.ts'
+import { EN, ZH } from '../../src/client/features/file-panel/locales.ts'
 import * as entry from '../../src/client/index.ts'
 import { clientEntryScene, FILES_TAB_ID, SESSION_ID, WORKSPACE_ROOT } from './scene.ts'
 
@@ -85,8 +87,14 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', () => ({
  */
 const FIBER_ACTIVE = 2
 
-/** The panel's failure copy, both languages, as `locales.ts` spells it. */
-const FAILURE_COPY = ['读取失败', 'Read failed'] as const
+/**
+ * The panel's failure copy, read from the dictionaries rather than spelled here.
+ *
+ * The wording is the look: pinning it would block the next person from rewording
+ * the line. What this file guards is that the failure is never *said* at all,
+ * which is the `error.unavailable` key, whatever it is currently translated to.
+ */
+const FAILURE_COPY = [ZH['error.unavailable'], EN['error.unavailable']] as const
 
 /** The note row the view renders for a level that could not be read. */
 const FAILED_NOTE = /data-dsh-tweaks-files-note="failed"[^>]*>([^<]*)</gu
@@ -187,7 +195,7 @@ describe('client entry over real cordis', () => {
       // regression that docked into the title would still satisfy a bare
       // existence check.
       const container = loaded.document.querySelector('[data-dsh-tweaks-file-panel]')
-      expect(container?.parentNode?.getAttribute('data-sidebar-right-tab')).toBe(FILES_TAB_ID)
+      expect(container?.parentNode?.getAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name)).toBe(FILES_TAB_ID)
     }
     finally {
       await loaded.unload()

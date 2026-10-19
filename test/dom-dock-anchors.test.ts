@@ -18,15 +18,16 @@ import {
   SIDEBAR_SESSION,
   tabHostOf,
 } from '../src/client/dom/dock-anchors.ts'
+import { DOCKKIT_ANCHORS } from '../src/client/dom/host-anchors.ts'
 import { createFakeDom } from './helpers/dom.ts'
 
 /** Build one tab's section inside a host element the kit drew it in. */
 function tabIn(document: ReturnType<typeof createFakeDom>['document'], tabId: string, hostValue: string | undefined) {
   const host = document.createElement('div')
   if (hostValue !== undefined)
-    host.setAttribute('data-dockkit-host', hostValue)
+    host.setAttribute(DOCKKIT_ANCHORS.host.name, hostValue)
   const section = document.createElement('section')
-  section.setAttribute('data-dockkit-content', tabId)
+  section.setAttribute(DOCKKIT_ANCHORS.content.name, tabId)
   host.appendChild(section)
   document.body.appendChild(host)
   return { host, section }
@@ -34,11 +35,16 @@ function tabIn(document: ReturnType<typeof createFakeDom>['document'], tabId: st
 
 describe('the kit anchor names', () => {
   it('builds the section selector from the tab id, escaped through the one escaper', () => {
-    expect(dockContentSelector('t-1')).toBe('[data-dockkit-content="t-1"]')
-    expect(dockContentSelector('a"b')).toBe('[data-dockkit-content="a\\22 b"]')
+    // 期望值手写选择器文本、只把属性名取自锚点常量：`dockContentSelector` 内部就是
+    // `attributeSelector`，期望值若也由它生成，这条断言对拼装契约就恒真了。
+    expect(dockContentSelector('t-1')).toBe(`[${DOCKKIT_ANCHORS.content.name}="t-1"]`)
+    expect(dockContentSelector('a"b')).toBe(`[${DOCKKIT_ANCHORS.content.name}="a\\22 b"]`)
   })
 
   it('names the session scope the tab actions read', () => {
+    // 这里断言的是锚点模块自身对外承诺的那一个字符串，字面量正是被守护的契约本身，
+    // 所以它必须留在这里：换成常量取值就成了自己和自己比，这条断言也就不再有内容。
+    // eslint-disable-next-line no-restricted-syntax -- 断言的正是锚点模块承诺的字符串本身
     expect(SIDEBAR_SESSION).toBe('data-sidebar-right-session')
   })
 })
@@ -97,8 +103,8 @@ describe('isDockedTab', () => {
   it('reads a host that shares the section element, with no wrapper above it', () => {
     const { document } = createFakeDom()
     const section = document.createElement('section')
-    section.setAttribute('data-dockkit-content', 't-1')
-    section.setAttribute('data-dockkit-host', FLOAT_HOST)
+    section.setAttribute(DOCKKIT_ANCHORS.content.name, 't-1')
+    section.setAttribute(DOCKKIT_ANCHORS.host.name, FLOAT_HOST)
     document.body.appendChild(section)
 
     expect(isDockedTab(document, 't-1')).toBe(false)

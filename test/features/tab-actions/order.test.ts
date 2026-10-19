@@ -15,6 +15,7 @@ import type { ElementLike } from '../../../src/client/dom/types.ts'
 import type { KindRecord } from '../../../src/client/features/tab-actions/order.ts'
 import type { FakeDom } from '../../helpers/dom.ts'
 import { describe, expect, it } from 'vitest'
+import { DOCKKIT_ANCHORS, SIDEBAR_RIGHT_ANCHORS } from '../../../src/client/dom/host-anchors.ts'
 import { combineOrder, readPlacements } from '../../../src/client/features/tab-actions/order.ts'
 import { createFakeDom } from '../../helpers/dom.ts'
 
@@ -28,7 +29,7 @@ const OTHER_SESSION = 's2'
 /** One Session's panel container, the scope every read is bounded by. */
 function panel(document: StandIn, sessionId: string): ElementLike {
   const container = document.createElement('div')
-  container.setAttribute('data-sidebar-right-session', sessionId)
+  container.setAttribute(SIDEBAR_RIGHT_ANCHORS.session.name, sessionId)
   document.body.appendChild(container)
   return container
 }
@@ -36,10 +37,10 @@ function panel(document: StandIn, sessionId: string): ElementLike {
 /** Build one docked pane's strip: a chips container holding one chip per id. */
 function strip(document: StandIn, into: ElementLike, paneId: string, tabIds: readonly string[]): ElementLike {
   const container = document.createElement('div')
-  container.setAttribute('data-dockkit-strip-tabs', paneId)
+  container.setAttribute(DOCKKIT_ANCHORS.stripTabs.name, paneId)
   for (const id of tabIds) {
     const chip = document.createElement('div')
-    chip.setAttribute('data-dockkit-tab', id)
+    chip.setAttribute(DOCKKIT_ANCHORS.tab.name, id)
     container.appendChild(chip)
   }
   into.appendChild(container)
@@ -59,10 +60,13 @@ function strip(document: StandIn, into: ElementLike, paneId: string, tabIds: rea
  */
 function host(document: StandIn, into: ElementLike, tabId: string, floating: boolean, paneId: string): ElementLike {
   const cell = document.createElement('div')
-  cell.setAttribute('data-dockkit-host', floating ? 'float' : 'dock')
+  cell.setAttribute(DOCKKIT_ANCHORS.host.name, floating ? 'float' : 'dock')
   const section = document.createElement('section')
-  section.setAttribute('data-dockkit-content', tabId)
-  section.setAttribute(floating ? 'data-dockkit-float' : 'data-dockkit-pane', paneId)
+  section.setAttribute(DOCKKIT_ANCHORS.content.name, tabId)
+  // `data-dockkit-pane` 是上游写的属性，但 `host-anchors.ts` 没有导出它：本插件从不读它，
+  // 这里只是把 kit 的嵌套画全。它不在常量表里，因而保留字面量。
+  // eslint-disable-next-line no-restricted-syntax -- 上游 kit 的 pane 标记，本插件从不读取
+  section.setAttribute(floating ? DOCKKIT_ANCHORS.float.name : 'data-dockkit-pane', paneId)
   cell.appendChild(section)
   into.appendChild(cell)
   return section
@@ -125,13 +129,16 @@ describe('reading the strip', () => {
     const { document } = createFakeDom()
     const view = panel(document, SESSION)
     const container = document.createElement('div')
-    container.setAttribute('data-dockkit-strip-tabs', 'pane-1')
+    container.setAttribute(DOCKKIT_ANCHORS.stripTabs.name, 'pane-1')
     const chipA = document.createElement('div')
-    chipA.setAttribute('data-dockkit-tab', 'a')
+    chipA.setAttribute(DOCKKIT_ANCHORS.tab.name, 'a')
     const caret = document.createElement('div')
+    // `data-dockkit-caret` 同样是上游写的属性，但本插件从不读它，`host-anchors.ts`
+    // 也就没有收录，所以这里的字面量是「画全 kit 的兄弟节点」而非在拼一个锚点常量。
+    // eslint-disable-next-line no-restricted-syntax -- 上游拖拽 caret 标记，本插件从不读取
     caret.setAttribute('data-dockkit-caret', '1')
     const chipB = document.createElement('div')
-    chipB.setAttribute('data-dockkit-tab', 'b')
+    chipB.setAttribute(DOCKKIT_ANCHORS.tab.name, 'b')
     container.appendChild(chipA)
     container.appendChild(caret)
     container.appendChild(chipB)

@@ -9,15 +9,17 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { DOCKKIT_ANCHORS } from '../src/client/dom/host-anchors.ts'
 import { attributeSelector, compoundSelector, escapeAttributeValue } from '../src/client/dom/selector.ts'
 
 describe('selector construction', () => {
   it('builds a presence selector from an attribute name', () => {
-    expect(attributeSelector('data-dockkit-host')).toBe('[data-dockkit-host]')
+    // 属性名取自锚点常量：这条测的是方括号的拼装，不是某个具体拼写。
+    expect(attributeSelector(DOCKKIT_ANCHORS.host.name)).toBe(`[${DOCKKIT_ANCHORS.host.name}]`)
   })
 
   it('builds an exact-value selector, quoting the value', () => {
-    expect(attributeSelector('data-dockkit-tab', '4:user')).toBe('[data-dockkit-tab="4:user"]')
+    expect(attributeSelector(DOCKKIT_ANCHORS.tab.name, '4:user')).toBe(`[${DOCKKIT_ANCHORS.tab.name}="4:user"]`)
   })
 
   it('joins parts into one compound selector', () => {

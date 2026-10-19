@@ -9,8 +9,10 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { DOCKKIT_ANCHORS } from '../src/client/dom/host-anchors.ts'
 import { installListener } from '../src/client/dom/listeners.ts'
 import { STYLE_ELEMENT_MARKER } from '../src/client/dom/markers.ts'
+import { attributeSelector, compoundSelector } from '../src/client/dom/selector.ts'
 import { installStyles } from '../src/client/dom/styles.ts'
 import { createFakeDom } from './helpers/dom.ts'
 import { createRecordingScope } from './helpers/scope.ts'
@@ -162,17 +164,17 @@ describe('the DOM stand-in itself', () => {
   it('supports the selector forms the plugin builds', () => {
     const { document } = createFakeDom()
     const openable = document.createElement('span')
-    openable.setAttribute('data-dockkit-host', 'dock')
+    openable.setAttribute(DOCKKIT_ANCHORS.host.name, 'dock')
     openable.setAttribute('class', 'q44v1G_openable q44v1G_other')
     const handTyped = document.createElement('span')
-    handTyped.setAttribute('data-dockkit-host', 'dock')
+    handTyped.setAttribute(DOCKKIT_ANCHORS.host.name, 'dock')
     handTyped.setAttribute('class', 'q44v1G_other')
     document.body.appendChild(openable)
     document.body.appendChild(handTyped)
 
-    expect(document.querySelectorAll('[data-dockkit-host]')).toHaveLength(2)
-    expect(document.querySelectorAll('[data-dockkit-host]:not([class*="_openable"])')).toHaveLength(1)
-    expect(document.querySelector('[data-dockkit-host]:not([class*="_openable"])')).toBe(handTyped)
+    expect(document.querySelectorAll(attributeSelector(DOCKKIT_ANCHORS.host.name))).toHaveLength(2)
+    expect(document.querySelectorAll(compoundSelector(attributeSelector(DOCKKIT_ANCHORS.host.name), ':not([class*="_openable"])'))).toHaveLength(1)
+    expect(document.querySelector(compoundSelector(attributeSelector(DOCKKIT_ANCHORS.host.name), ':not([class*="_openable"])'))).toBe(handTyped)
   })
 
   it('refuses a selector form it does not implement instead of matching nothing', () => {
@@ -209,35 +211,35 @@ describe('closest, for reading a property off an ancestor', () => {
   it('finds the element itself when it matches', () => {
     const { document } = createFakeDom()
     const host = document.createElement('div')
-    host.setAttribute('data-dockkit-host', 'dock')
+    host.setAttribute(DOCKKIT_ANCHORS.host.name, 'dock')
     document.body.appendChild(host)
-    expect(host.closest('[data-dockkit-host]')).toBe(host)
+    expect(host.closest(attributeSelector(DOCKKIT_ANCHORS.host.name))).toBe(host)
   })
 
   it('walks up to the nearest matching ancestor, not the outermost', () => {
     const { document } = createFakeDom()
     const outer = document.createElement('div')
-    outer.setAttribute('data-dockkit-host', 'float')
+    outer.setAttribute(DOCKKIT_ANCHORS.host.name, 'float')
     const inner = document.createElement('div')
-    inner.setAttribute('data-dockkit-host', 'dock')
+    inner.setAttribute(DOCKKIT_ANCHORS.host.name, 'dock')
     const section = document.createElement('section')
-    section.setAttribute('data-dockkit-content', 'tab-1')
+    section.setAttribute(DOCKKIT_ANCHORS.content.name, 'tab-1')
     outer.appendChild(inner)
     inner.appendChild(section)
     document.body.appendChild(outer)
 
     // This is the shape the panel reads: an identity attribute on the inner
     // element, the property it wants on the wrapping host.
-    const found = document.querySelector('[data-dockkit-content="tab-1"]')?.closest('[data-dockkit-host]')
+    const found = document.querySelector(attributeSelector(DOCKKIT_ANCHORS.content.name, 'tab-1'))?.closest(attributeSelector(DOCKKIT_ANCHORS.host.name))
     expect(found).toBe(inner)
-    expect(found?.getAttribute('data-dockkit-host')).toBe('dock')
+    expect(found?.getAttribute(DOCKKIT_ANCHORS.host.name)).toBe('dock')
   })
 
   it('returns null when nothing on the way up matches', () => {
     const { document } = createFakeDom()
     const orphan = document.createElement('span')
     document.body.appendChild(orphan)
-    expect(orphan.closest('[data-dockkit-host]')).toBeNull()
+    expect(orphan.closest(attributeSelector(DOCKKIT_ANCHORS.host.name))).toBeNull()
   })
 
   it('refuses a descendant selector rather than silently ignoring its first part', () => {

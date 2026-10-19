@@ -24,6 +24,7 @@ import type { DirectoryIo } from '../../../src/client/features/file-panel/contro
 import type { PanelMount, PanelRenderer, PanelView } from '../../../src/client/features/file-panel/panel-mount.ts'
 import type { FakeNode } from './fake-host-dom.ts'
 import { describe, expect, it } from 'vitest'
+import { SIDEBAR_RIGHT_ANCHORS } from '../../../src/client/dom/host-anchors.ts'
 import { createPanelController } from '../../../src/client/features/file-panel/controller.ts'
 import { PANEL_HOST_ATTRIBUTE } from '../../../src/client/features/file-panel/panel-host.ts'
 import { createPanelMount } from '../../../src/client/features/file-panel/panel-mount.ts'
@@ -91,7 +92,7 @@ async function mount(levels: Record<string, { name: string, type: 'file' | 'dire
 function bodyMaker(fake: ReturnType<typeof createFakeDom>) {
   return (id: string) => {
     const element = fake.document.createElement('section')
-    element.setAttribute('data-sidebar-right-tab', id)
+    element.setAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name, id)
     fake.document.body.appendChild(element)
     return element
   }
@@ -231,7 +232,7 @@ describe('one panel, moved between tabs', () => {
     h.mount.show({ sessionId: sessionId('s1'), workspaceRoot: '/w', address: fileAddress('a.ts'), kind: 'text' })
     h.mount.dockInto(h.body('file-2'), 'dock')
     await settle()
-    expect(h.mount.container().parentNode?.getAttribute('data-sidebar-right-tab')).toBe('file-2')
+    expect(h.mount.container().parentNode?.getAttribute(SIDEBAR_RIGHT_ANCHORS.tab.name)).toBe('file-2')
   })
 
   it('reports every view with the panel\'s whole state, so the renderer can draw the tree', async () => {
