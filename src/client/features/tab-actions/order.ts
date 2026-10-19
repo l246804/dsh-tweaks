@@ -29,6 +29,7 @@ import type { TabId } from '@deepseek-ai/dsh-client-ui-dockkit'
 import type { OrderedTab, TabHost } from './targets.ts'
 import {
   DOCK_HOST,
+  DOCK_HOST_SELECTOR,
   DOCKKIT_CONTENT,
   DOCKKIT_FLOAT,
   DOCKKIT_HOST,
@@ -43,10 +44,12 @@ import { attributeSelector } from '../../dom/selector.ts'
 /**
  * The narrowest element surface this reader needs.
  *
- * It asks an element for attributes and for its matching descendants, nothing
- * more. The browser's own `Element` satisfies it structurally, and so does this
- * project's test stand-in, so the production read and the tested read are one
- * implementation.
+ * It asks an element for attributes, for its matching descendants, and for the
+ * nearest matching ancestor. That last one is not optional: the kit writes a tab's
+ * identity on its `<section>` and where it stands on the wrapper around it, so
+ * reaching "docked or floating" is a walk up from the section. The browser's own
+ * `Element` satisfies this surface structurally, and so does this project's test
+ * stand-in, so the production read and the tested read are one implementation.
  */
 interface ReadableElement {
   /**
@@ -61,6 +64,12 @@ interface ReadableElement {
    * @returns the matches, in document order.
    */
   querySelectorAll: (selector: string) => Iterable<ReadableElement>
+  /**
+   * Find the nearest matching ancestor, including this element.
+   * @param selector - a CSS selector.
+   * @returns the nearest match, or null.
+   */
+  closest: (selector: string) => ReadableElement | null
 }
 
 /** The document surface this reader needs. */
@@ -104,7 +113,10 @@ interface SectionEntry {
  *
  * The section is the one anchor that exists for every tab whether or not it is
  * selected, so it is the completeness source: a strip can be absent, a section
- * cannot.
+ * cannot. Where the tab stands is on the wrapper around the section rather than
+ * on the section itself, so that answer is one walk up; asking the section
+ * directly would answer `null` for every tab and report all of them as docked
+ * (see {@link DOCK_HOST_SELECTOR}).
  * @param root - the document to read.
  * @param scope - the Session's own selector prefix.
  * @returns one entry per section.
@@ -115,9 +127,10 @@ function sectionEntries(root: ReadableRoot, scope: string): readonly SectionEntr
     const id = section.getAttribute(DOCKKIT_CONTENT)
     if (id === null)
       continue
+    const host = section.closest(DOCK_HOST_SELECTOR)
     entries.push({
       id,
-      host: tabHostOf(section.getAttribute(DOCKKIT_HOST)),
+      host: tabHostOf(host?.getAttribute(DOCKKIT_HOST) ?? null),
       floatPaneId: section.getAttribute(DOCKKIT_FLOAT) ?? undefined,
     })
   }

@@ -46,13 +46,25 @@ function strip(document: StandIn, into: ElementLike, paneId: string, tabIds: rea
   return container
 }
 
-/** Build one tab's permanent host section, docked or floating. */
+/**
+ * Build one tab's permanent host section, docked or floating.
+ *
+ * The markup follows the kit's own nesting, which is what makes this stand-in a
+ * faithful one: the **wrapper** carries where the tab stands
+ * (`data-dockkit-host`, `TabLayout.tsx`), and the `<section>` inside it carries
+ * the tab's identity (`data-dockkit-content`) plus, when floating, the pane that
+ * draws it. Writing the host attribute on the section instead would place it
+ * where the kit never writes it, and a read of the wrong element would pass the
+ * suite while matching nothing in a browser.
+ */
 function host(document: StandIn, into: ElementLike, tabId: string, floating: boolean, paneId: string): ElementLike {
+  const cell = document.createElement('div')
+  cell.setAttribute('data-dockkit-host', floating ? 'float' : 'dock')
   const section = document.createElement('section')
   section.setAttribute('data-dockkit-content', tabId)
-  section.setAttribute('data-dockkit-host', floating ? 'float' : 'dock')
   section.setAttribute(floating ? 'data-dockkit-float' : 'data-dockkit-pane', paneId)
-  into.appendChild(section)
+  cell.appendChild(section)
+  into.appendChild(cell)
   return section
 }
 

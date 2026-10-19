@@ -119,6 +119,21 @@ export function dockContentSelector(tabId: string): string {
 }
 
 /**
+ * The selector for the element stating where a tab stands, as the kit spells it.
+ *
+ * The kit writes the two anchors on **different elements**: the `<section>` the
+ * tab id rides on sits inside a wrapper, and it is the wrapper that carries
+ * `data-dockkit-host` (`TabLayout.tsx` renders the wrapper `div` with the host
+ * and column, and the `section` inside it with the content and pane). Reading
+ * the attribute off the section therefore answers `null` for every tab, which
+ * {@link tabHostOf} turns into "docked", so every floating tab would be counted
+ * as one on the docked surface. The one way to reach the answer is a walk up
+ * from the section, which is why this selector is exported: a caller that holds
+ * a section reaches the host element through `closest`.
+ */
+export const DOCK_HOST_SELECTOR = attributeSelector(DOCKKIT_HOST)
+
+/**
  * The selector for one tab's seats, as the right sidebar spells them.
  * @param tabId - the tab record's id.
  * @returns selector text.
@@ -126,9 +141,6 @@ export function dockContentSelector(tabId: string): string {
 export function sidebarTabSelector(tabId: string): string {
   return attributeSelector(SIDEBAR_TAB, tabId)
 }
-
-/** The selector naming a tab's host element, which states whether it is docked. */
-const DOCK_HOST_SELECTOR = attributeSelector(DOCKKIT_HOST)
 
 /**
  * One element of the kit's markup, as an anchored read reaches it.

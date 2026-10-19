@@ -77,13 +77,21 @@ interface Harness {
   readonly unload: () => void
 }
 
-/** Build the tab host section the docking kit draws for every tab. */
+/**
+ * Build the tab host the docking kit draws for every tab.
+ *
+ * Same nesting as the kit and as `order.test.ts`: the wrapper states where the
+ * tab stands, the `<section>` inside it carries the tab's identity. Putting the
+ * host attribute on the section would let a read of the wrong element pass here.
+ */
 function host(document: StandIn, into: ElementLike, tabId: string, floating: boolean, paneId: string): void {
+  const cell = document.createElement('div')
+  cell.setAttribute('data-dockkit-host', floating ? 'float' : 'dock')
   const section = document.createElement('section')
   section.setAttribute('data-dockkit-content', tabId)
-  section.setAttribute('data-dockkit-host', floating ? 'float' : 'dock')
   section.setAttribute(floating ? 'data-dockkit-float' : 'data-dockkit-pane', paneId)
-  into.appendChild(section)
+  cell.appendChild(section)
+  into.appendChild(cell)
 }
 
 /** Draw one Session's sidebar into the stand-in document. */
