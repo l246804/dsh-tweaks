@@ -162,7 +162,7 @@ export function install(ctx: ClientContext): void {
   }, 'dsh-tweaks: file-panel instance')
 
   ctx.effect(
-    () => installPanelToggle(ctx.slots, { mount: panel.mount, t }),
+    () => installPanelToggle(ctx, { mount: panel.mount }),
     'dsh-tweaks: file-panel toolbar toggle',
   )
 }

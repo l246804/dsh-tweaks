@@ -38,11 +38,16 @@ import type {} from '@deepseek-ai/dsh-api-session-controller/client'
 import type {} from '@deepseek-ai/dsh-api-workspace-files/client'
 // User-visible copy, so the plugin's own strings follow the host's language.
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-// Attachment identity and media types, as the message renderer sees them.
-import type {} from '@deepseek-ai/dsh-client-ui-attachment/client'
+// The snapshot-store types the slot system's derived seats are declared
+// against. The slot packages import that surface themselves, so the package
+// must be installed regardless; this edge is what declares it used, and without
+// it `knip` reports an unused devDependency. Compilation-time only.
+import type {} from '@deepseek-ai/dsh-client-store'
 
 // --- The host data a feature reads ------------------------------------------
 
+// Attachment identity and media types, as the message renderer sees them.
+import type {} from '@deepseek-ai/dsh-client-ui-attachment/client'
 // The chat node registry and renderer slots, declared by the package that
 // renders a message row.
 import type {} from '@deepseek-ai/dsh-client-ui-chat/client'
@@ -57,6 +62,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-primitives'
 // The renderer's slot and component contracts, which a feature's registered
 // component is typed against.
 import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+// The document preview: the file tab's body, and the toolbar seats beside it.
+// Its `sidebar.right.tab.document.actions` declaration is what types this
+// plugin's file-list toggle; only the type is reachable, because the package is
+// not a row of the shell's module table (see `features/file-panel/toolbar.ts`).
+import type {} from '@deepseek-ai/dsh-client-ui-sidebar-documentpreview/client'
 // The right sidebar's navigation face and its tab-type registry, including the
 // `extension` priority band that may take over a built-in tab kind.
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'

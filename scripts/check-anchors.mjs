@@ -29,12 +29,10 @@
  */
 
 import { readdir, readFile, stat } from 'node:fs/promises'
-import { dirname, join, relative, resolve } from 'node:path'
+import { join, relative } from 'node:path'
 import process from 'node:process'
-import { fileURLToPath } from 'node:url'
+import { DECLARATIONS, PACKAGE_ROOT, readDeclaredAnchors, spellsAttribute } from './host-anchor-declarations.mjs'
 
-const PACKAGE_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const DECLARATIONS = join(PACKAGE_ROOT, 'src/client/dom/host-anchors.ts')
 const UPSTREAM_ROOT = join(PACKAGE_ROOT, 'deepseek-harness')
 const UPSTREAM_PACKAGES = join(UPSTREAM_ROOT, 'packages')
 
@@ -60,25 +58,6 @@ function check(label, condition, detail) {
     return
   }
   failures.push(detail === undefined ? label : `${label}: ${detail}`)
-}
-
-/**
- * Read the declared anchors out of the one module allowed to spell them.
- *
- * The declaration form is `{ name: '<attribute>', owner: '<package path>' }`,
- * which is what `HostAnchor` requires and what keeps this script free of a
- * second parser for a file the type checker already validates.
- * @returns the anchors, in declaration order.
- */
-async function readDeclaredAnchors() {
-  const source = await readFile(DECLARATIONS, 'utf8')
-  const pattern = /\{\s*name:\s*'([^']+)',\s*owner:\s*'([^']+)'\s*\}/gu
-  return [...source.matchAll(pattern)].map(match => ({
-    /** The attribute name, e.g. `data-dockkit-host`. */
-    name: match[1],
-    /** The upstream package that writes it, e.g. `client/ui-dockkit`. */
-    owner: match[2],
-  }))
 }
 
 /**
@@ -112,7 +91,7 @@ async function collectSources(directory) {
 async function findAnchor(packageDirectory, attribute) {
   for (const file of await collectSources(packageDirectory)) {
     const source = await readFile(file, 'utf8')
-    if (source.includes(attribute))
+    if (spellsAttribute(source, attribute))
       return relative(PACKAGE_ROOT, file)
   }
   return undefined
